@@ -1,4 +1,4 @@
-Patukarna instrument resynthesis references
+Kansen instrument resynthesis references
 
 The app contains measured oscillator frequencies, spectral envelopes, upper-mode phase evolution and noise-band
 levels derived from these references. It does not contain or play their waveform

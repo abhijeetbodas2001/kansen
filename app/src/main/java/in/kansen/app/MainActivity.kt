@@ -1,4 +1,4 @@
-package `in`.sukarna.app
+package `in`.kansen.app
 
 import android.os.Bundle
 import android.content.Context
@@ -92,7 +92,7 @@ class MainActivity : ComponentActivity() {
             Toast.makeText(this, R.string.audio_error, Toast.LENGTH_SHORT).show()
         }
         setContent {
-            Patukarna(player) {
+            Kansen(player) {
                 val language = if (resources.configuration.locales[0].language == "mr") "en" else "mr"
                 getSharedPreferences("preferences", MODE_PRIVATE).edit().putString("language", language).apply()
                 recreate()
@@ -104,7 +104,7 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-private fun Patukarna(player: TonePlayer, onLanguageChange: () -> Unit) {
+private fun Kansen(player: TonePlayer, onLanguageChange: () -> Unit) {
     val dark = isSystemInDarkTheme()
     val scheme = if (dark) darkColorScheme(
         primary = Color(0xFFB8D6C4), onPrimary = Color(0xFF12372B),
@@ -163,7 +163,7 @@ private fun Patukarna(player: TonePlayer, onLanguageChange: () -> Unit) {
                         Spacer(Modifier.width(4.dp))
                     } else {
                         Image(
-                            painter = painterResource(R.drawable.patukarna_logo),
+                            painter = painterResource(R.drawable.kansen_logo),
                             contentDescription = null,
                             modifier = Modifier.size(40.dp),
                         )

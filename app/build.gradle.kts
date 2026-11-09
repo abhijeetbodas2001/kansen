@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace = "in.sukarna.app"
+    namespace = "in.kansen.app"
     compileSdk = 37
     buildToolsVersion = "37.0.0"
     defaultConfig {
-        applicationId = "in.sukarna.app"
+        applicationId = "in.kansen.app"
         minSdk = 26
         targetSdk = 37
         versionCode = 1

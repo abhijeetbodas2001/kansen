@@ -1,3 +1,3 @@
-# Patukarna · पटुकर्ण
+# Kansen · कानसेन
 
 Ear training app for hindustani classical music.

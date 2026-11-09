@@ -1,4 +1,4 @@
-package `in`.sukarna.app
+package `in`.kansen.app
 
 import android.content.Context
 import android.media.AudioAttributes
