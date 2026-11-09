@@ -1,0 +1,65 @@
+<resources>
+    <string name="manual">वापर मार्गदर्शिका</string>
+    <string name="manual_body">सुरुवात\nसुकर्णमध्ये हिंदुस्तानी संगीताचे स्वर ऐकता येतात आणि ते ओळखण्याचा सराव करता येतो.\n• पट्ट्या: स्वर पाहा आणि ऐका.\n• अभ्यास: पट्ट्या आणि स्वर ओळखण्याचा सराव करा.\n• मागे जाण्यासाठी वरचा बाण वापरा.\n\nभाषा\nसुरुवातीला मराठी भाषा निवडलेली असते. वरच्या भाषा बटणाने मराठी किंवा इंग्रजी निवडा. तुमची निवड जतन केली जाते.\n\nपट्ट्या आणि स्वर\nसात पांढऱ्या आणि पाच काळ्या अशा १२ पट्ट्यांपैकी एक निवडा. पट्टीजवळचे वर्तुळ तिच्या आधारस्वराच्या पट्टीचा रंग दाखवते.\n• पांढरी १ चा सा C4 आहे. पुढील पट्ट्यांचे सा अर्ध्या स्वराच्या अंतराने चढत B4 पर्यंत जातात.\n• हार्मोनियमच्या मांडणीत १२ स्वर आणि पुढच्या सप्तकातील सा आहे. कोमल आणि तीव्र स्वर स्पष्टपणे दर्शवले आहेत.\n• स्वर ऐकण्यासाठी कळ दाबून ठेवा; सोडल्यावर आवाज थांबतो. कळ दाबलेली असताना खाली स्वराचे नाव आणि Hz मधील वारंवारता दिसते.\n• पट्टीच्या नावाजवळील सा बटण दाबल्यावर त्या पट्टीचा सा ३ सेकंद ऐकू येतो.\n\nपट्टी ओळखणे\nएक पट्टी यादृच्छिकपणे निवडली जाते.\n• ऐका: निवडलेल्या पट्टीचा सा ३ सेकंद ऐका. नवीन पट्टी निवडेपर्यंत तोच सा पुन्हा ऐकू येतो.\n• नवीन पट्टी: वेगळी पट्टी निवडा आणि उत्तर लपवा.\n• उत्तर दाखवा / लपवा: बटणांखाली पट्टी दाखवा किंवा लपवा.\n\nस्वर ओळखणे\nयादीतून एक पट्टी किंवा कोणतीही पट्टी निवडा. या अभ्यासात एका सप्तकातील १२ स्वर वापरले जातात.\n• ऐका: आधी आधारस्वर सा ३ सेकंद, त्यानंतर त्याच पट्टीतील एक यादृच्छिक स्वर ३ सेकंद ऐका.\n• नवीन स्वर: वेगळा स्वर निवडा. कोणतीही पट्टी निवडलेली असल्यास पट्टीही बदलते.\n• उत्तर दाखवा / लपवा: स्वर आणि त्याची पट्टी दोन्ही दाखवा किंवा लपवा.\n• नवीन स्वर किंवा पट्टी निवडेपर्यंत तीच स्वरांची जोडी पुन्हा ऐकू येते. यादीतील निवड बदलल्यावर नवीन प्रश्न सुरू होतो.\n\nआवाज आणि उलटगणना\n• १ सेकंदात वाढणारा आवाज: प्रत्येक स्वर शून्य आवाजापासून सुरू होऊन पहिल्या सेकंदात हळूहळू पूर्ण पातळीपर्यंत पोहोचतो.\n• हा वेळ ३ सेकंदांच्या कालावधीतच समाविष्ट आहे. कळ दाबून ठेवल्यास आवाज सुरुवातीलाच वाढतो; त्यानंतर कळ सोडेपर्यंत पूर्ण पातळीवर राहतो.\n• अभ्यासात कमी होत जाणारे वर्तुळ आणि ३–२–१ अशी उलटगणना दिसते. स्वर ओळखण्याच्या अभ्यासात दुसऱ्या स्वरासाठी उलटगणना पुन्हा सुरू होते.\n• उलटगणनेची खिडकी बंद केल्यावर आवाज थांबतो.\n\nआवाजाची पातळी आणि स्वरमापन\n• आवाज कमी-जास्त करण्यासाठी उपकरणाचा मीडिया व्हॉल्यूम वापरा.\n• स्वर कृत्रिमरीत्या तयार केलेले स्थिर स्वर आहेत; ते हार्मोनियमचे ध्वनिमुद्रण नाही.\n• स्वरमापन समान अंतराच्या १२ स्वरांवर आधारित आहे आणि A4 = 440 Hz हा आधार वापरतो. हे समान स्वरमापनाच्या हार्मोनियमप्रमाणे आहे; यात रागानुसार बदलणाऱ्या श्रुतींचे समायोजन नाही.\n• अ‍ॅप इंटरनेटशिवाय चालते. उत्तर पाहून स्वतःचा सराव तपासा; अ‍ॅप तुमचे गायन ऐकत नाही किंवा त्याला गुण देत नाही.</string>
+    <string name="frequency_hz">%1$.2f Hz</string>
+    <string name="select_scale">पट्टी</string>
+    <string name="random_scale">कोणतीही पट्टी</string>
+    <string name="refresh_note">नवीन स्वर</string>
+    <string name="practice_swara">स्वर</string>
+    <string name="refresh">नवीन पट्टी</string>
+    <string name="play">ऐका</string>
+    <string name="hide">लपवा</string>
+    <string name="hear_again">पुन्हा ऐका</string>
+    <string name="listen">ऐका</string>
+    <string name="reveal">उत्तर दाखवा</string>
+    <string name="scale_identification">पट्टी ओळखणे</string>
+    <string name="note_identification">स्वर ओळखणे</string>
+    <string name="back_to_training">अभ्यासाकडे परत जा</string>
+    <string name="upper_octave">तार</string>
+    <string name="training">अभ्यास</string>
+    <string name="back_to_home">मुख्य पानावर परत जा</string>
+    <string name="hello_world">Hello world</string>
+    <string name="app_name">सुकर्ण</string>
+    <string name="language_switch">English</string>
+    <string name="switch_language_description">इंग्रजी भाषा निवडा</string>
+    <string name="back_to_scales">पट्ट्यांकडे परत जा</string>
+    <string name="find_sa">०१  /  तुमचा सा शोधा</string>
+    <string name="journey">सुरांची सुरुवात\nआपल्या सापासून.</string>
+    <string name="choose_tonic">तुमची पट्टी निवडा. ऐका, गा आणि प्रत्येक स्वराशी मैत्री करा.</string>
+    <string name="listening_daily">दररोज थोडे ऐका, सुरांशी नाते जोडा.</string>
+    <string name="scale_count_subtitle">१२ पट्ट्या · प्रत्येकी १२ स्वर</string>
+    <string name="scales">पट्ट्या</string>
+    <string name="twelve_tonics">१२ पट्ट्या</string>
+    <string name="white_scale">पांढरी %1$d</string>
+    <string name="black_scale">काळी %1$d</string>
+    <string name="scale_summary">सा = %1$s</string>
+    <string name="open_scale">%1$s, सा %2$s वर. तार सापर्यंतचे स्वर उघडा</string>
+    <string name="scale_footer">सात पांढऱ्या पट्ट्या. पाच काळ्या पट्ट्या.\nसुरुवातीसाठी बारा पर्याय.</string>
+    <string name="scale_breadcrumb">पट्ट्या  /  %1$s</string>
+    <string name="sa_anchor">‘सा’चा आधार घेऊन स्वर ओळखा.</string>
+    <string name="your_tonic">तुमचा आधारस्वर</string>
+    <string name="tonic_pitch">सा  /  %1$s</string>
+    <string name="play_sa">▶  सा</string>
+    <string name="replay_sa">↻  सा</string>
+    <string name="explore_swaras">स्वरांची ओळख</string>
+    <string name="tap_to_listen">स्वर ऐकण्यासाठी पट्टी दाबून ठेवा. थांबवण्यासाठी सोडा.</string>
+    <string name="playing">वाजत आहे</string>
+    <string name="play_swara">%1$s %2$s ऐका, %3$s</string>
+    <string name="practice_note">रियाजासाठी एक टीप</string>
+    <string name="swara_explanation">सा आणि प हे अचल स्वर आहेत. रे, ग, ध आणि नि यांची कोमल रूपे असतात; मचे तीव्र रूप असते.</string>
+    <string name="tuning_note">हार्मोनियमचे स्वरमापन · A4 = 440 Hz · सापासून एक सप्तक</string>
+    <string name="audio_error">हा स्वर वाजवता आला नाही. पुन्हा प्रयत्न करा.</string>
+    <string name="kind_achal">अचल</string>
+    <string name="kind_shuddha">शुद्ध</string>
+    <string name="kind_komal">कोमल</string>
+    <string name="kind_tivra">तीव्र</string>
+    <string name="swara_sa">सा</string>
+    <string name="swara_re">रे</string>
+    <string name="swara_ga">ग</string>
+    <string name="swara_ma">म</string>
+    <string name="swara_pa">प</string>
+    <string name="swara_dha">ध</string>
+    <string name="swara_ni">नि</string>
+    <string name="keyboard_hint">सर्व १२ स्वर पाहण्यासाठी पट्ट्या सरकवा किंवा खालील सरकपट्टी ओढा.</string>
+    <string name="keyboard_scroll">हार्मोनियमच्या पट्ट्या सरकवा</string>
+</resources>

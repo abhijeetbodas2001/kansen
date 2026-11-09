@@ -1,0 +1,65 @@
+<resources>
+    <string name="manual">Manual</string>
+    <string name="manual_body">Getting started\nSukarna helps you listen to and identify Hindustani swaras.\n• Scales: explore and play notes.\n• Training: practise identifying scales and swaras.\n• Use the back arrow to return.\n\nLanguage\nMarathi is the default. Use the language button at the top to switch between Marathi and English. Your choice is remembered.\n\nScales and keys\nChoose from 12 scales: seven white and five black. The circle beside each scale indicates its tonic key colour.\n• White 1 starts at C4. The scales rise in semitone steps through B4.\n• Each harmonium layout has 12 swaras plus the next, higher Sa. Komal and tivra notes are labelled explicitly.\n• Hold a key to hear it continuously; release it to stop. Its swara name and frequency in Hz appear below while held.\n• Tap Sa beside the scale name to hear its reference Sa for 3 seconds.\n\nScale identification\nA scale is selected at random.\n• Play: hear its Sa for 3 seconds. Play repeats the same Sa until you refresh.\n• Refresh: choose a different scale and hide the answer.\n• Reveal / Hide: show or conceal the scale below the buttons.\n\nNote identification\nChoose a scale from the dropdown, or choose Random. The exercise uses the 12 swaras within one octave.\n• Play: hear the reference Sa for 3 seconds, followed by a random swara from that scale for 3 seconds.\n• Refresh: choose a different swara. With Random selected, the scale changes too.\n• Reveal / Hide: show or conceal both the swara and its scale.\n• Play repeats the same pair until you refresh or change the dropdown selection. Changing the selection starts a new question.\n\nPlayback and countdown\n• 1-second fade-in: every note starts silent and gradually reaches full volume during its first second.\n• The fade-in is included in the 3-second playback duration. Held keys fade in once, then stay at full volume until released.\n• Training shows a shrinking ring with a 3–2–1 countdown. In note identification, the countdown restarts for the second sound.\n• Dismissing the countdown popup stops playback.\n\nSound and tuning\n• Use your device’s media volume to adjust loudness.\n• The sounds are steady synthetic tones, not recordings of a harmonium.\n• Tuning uses 12-tone equal temperament with A4 = 440 Hz, like an equal-tempered harmonium. Raga-specific shruti adjustments are not modelled.\n• The app works offline. Check your answers yourself: the exercises do not listen to or grade your singing.</string>
+    <string name="frequency_hz">%1$.2f Hz</string>
+    <string name="select_scale">Scale</string>
+    <string name="random_scale">Random</string>
+    <string name="refresh_note">Refresh</string>
+    <string name="practice_swara">Swara</string>
+    <string name="refresh">Refresh</string>
+    <string name="play">Play</string>
+    <string name="hide">Hide</string>
+    <string name="hear_again">Hear again</string>
+    <string name="listen">Listen</string>
+    <string name="reveal">Reveal</string>
+    <string name="scale_identification">Scale identification</string>
+    <string name="note_identification">Note identification</string>
+    <string name="back_to_training">Back to training</string>
+    <string name="upper_octave">Upper</string>
+    <string name="training">Training</string>
+    <string name="back_to_home">Back to home</string>
+    <string name="hello_world">Hello world</string>
+    <string name="app_name">sukarna</string>
+    <string name="language_switch">मराठी</string>
+    <string name="switch_language_description">Switch to Marathi</string>
+    <string name="back_to_scales">Back to scales</string>
+    <string name="find_sa">01  /  FIND YOUR SA</string>
+    <string name="journey">Every journey\nbegins with Sa.</string>
+    <string name="choose_tonic">Choose your tonic. Listen, sing, and make each swara your own.</string>
+    <string name="listening_daily">A little listening, every day.</string>
+    <string name="scale_count_subtitle">12 scales · 12 swaras each</string>
+    <string name="scales">Scales</string>
+    <string name="twelve_tonics">12 TONICS</string>
+    <string name="white_scale">White %1$d</string>
+    <string name="black_scale">Black %1$d</string>
+    <string name="scale_summary">Sa = %1$s</string>
+    <string name="open_scale">%1$s, Sa at %2$s. Open swaras through upper Sa</string>
+    <string name="scale_footer">Seven white keys. Five black keys.\nTwelve places to begin.</string>
+    <string name="scale_breadcrumb">SCALES  /  %1$s</string>
+    <string name="sa_anchor">Let Sa be your anchor.</string>
+    <string name="your_tonic">YOUR TONIC</string>
+    <string name="tonic_pitch">सा  /  %1$s</string>
+    <string name="play_sa">▶  Sa</string>
+    <string name="replay_sa">↻  Sa</string>
+    <string name="explore_swaras">Explore the swaras</string>
+    <string name="tap_to_listen">Hold a key to listen. Release it to stop.</string>
+    <string name="playing">PLAYING</string>
+    <string name="play_swara">Play %1$s %2$s, %3$s</string>
+    <string name="practice_note">A note on your practice</string>
+    <string name="swara_explanation">Sa and Pa are fixed (achal). Re, Ga, Dha and Ni have komal forms; Ma has a tivra form.</string>
+    <string name="tuning_note">Harmonium tuning · A4 = 440 Hz · One octave from Sa</string>
+    <string name="audio_error">Couldn’t play this swara. Please try again.</string>
+    <string name="kind_achal">Achal</string>
+    <string name="kind_shuddha">Shuddha</string>
+    <string name="kind_komal">Komal</string>
+    <string name="kind_tivra">Tivra</string>
+    <string name="swara_sa">Sa</string>
+    <string name="swara_re">Re</string>
+    <string name="swara_ga">Ga</string>
+    <string name="swara_ma">Ma</string>
+    <string name="swara_pa">Pa</string>
+    <string name="swara_dha">Dha</string>
+    <string name="swara_ni">Ni</string>
+    <string name="keyboard_hint">Swipe the keys or drag the slider to explore all 12 swaras.</string>
+    <string name="keyboard_scroll">Scroll the harmonium keyboard</string>
+</resources>
