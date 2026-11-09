@@ -40,3 +40,21 @@ only harmonium profiles; their reference waveforms are not included.
 To evaluate a change, compare loudness-matched reference and rendered excerpts,
 including attacks and held loops. Spectral similarity, pitch and clipping checks
 can catch errors but do not establish perceptual realism.
+
+The renderer also levels the actual mixed sustain after the loop crossfade.
+A circular, approximately 60 ms RMS window (an integer number of note periods)
+measures waveform energy, including cancellation that model-envelope power alone
+cannot predict. Bounded correction fades in after the initial attack. This keeps
+the loop join from making periodic loudness dips while retaining harmonic colour.
+Playback release uses a 20 ms quadratic volume fade and retires the track after
+24 ms. A newly pressed key can start while the previous track finishes its fade.
+
+Harmonium now uses each harmonic/noise band's measured sustain RMS and settled
+relative harmonic phase from the first sample. The previously retained reed-attack
+motion was audible as roughness during fade-in. Tonal colour still comes from the
+measured harmonic balance, but its levels and phases no longer flutter at onset.
+
+The one-second fade-in is applied sample by sample to the final PCM, replacing
+10 ms main-thread volume updates. The loop starts at 1.1 s, after the fade has
+finished, so held notes never repeat it. AudioTrack starts at unity gain; the
+existing short volume fade-out still handles key release independently.

@@ -53,7 +53,7 @@ object Music {
         val loopCycles = kotlin.math.round(target * 1.5).toInt()
         val loopFrames = kotlin.math.round(sampleRate * loopCycles / target).toInt()
         val actual = sampleRate * loopCycles / loopFrames
-        val introFrames = 28665 // 650 ms before the sustain loop
+        val introFrames = 48510 // 1.1 s: the loop starts after the one-second fade.
         val count = introFrames + loopFrames
         val output = DoubleArray(count)
         val start = 0
@@ -61,13 +61,18 @@ object Music {
         fun modelTime(t: Double, rate: Double) = if (t <= .03) t else .03 + (t - .03) * rate
         val envelopeBuffer = DoubleArray(count - start)
         fun envelope(values: DoubleArray, rate: Double = 1.0): DoubleArray {
+            val steadyStart = (.65 / stepSeconds).toInt().coerceAtMost(values.lastIndex)
+            val steadyEnd = (2.15 / stepSeconds).toInt().coerceAtMost(values.lastIndex)
+            val steadyLevel = if (instrument == Instrument.HARMONIUM)
+                kotlin.math.sqrt((steadyStart..steadyEnd).sumOf { values[it] * values[it] } /
+                    (steadyEnd - steadyStart + 1)) else 0.0
             for (i in envelopeBuffer.indices) {
                 val t = modelTime(i / sampleRate, rate)
                 val position = (t / stepSeconds).coerceAtMost(values.lastIndex.toDouble())
                 val left = position.toInt()
                 val fraction = position - left
                 val measured = values[left] * (1 - fraction) + values[(left + 1).coerceAtMost(values.lastIndex)] * fraction
-                envelopeBuffer[i] = measured
+                envelopeBuffer[i] = if (instrument == Instrument.HARMONIUM) steadyLevel else measured
             }
             return envelopeBuffer
         }
@@ -75,6 +80,17 @@ object Music {
             listOf(SpectralMode(1.0, 0.0, doubleArrayOf(1.0)))
         } else requireNotNull(model) { "Missing instrument model: $instrument" }.modes
         for (mode in modes) {
+            val phaseTrack = if (instrument == Instrument.HARMONIUM && mode.phases.isNotEmpty()) {
+                // Use the settled reed alignment from the very first sample.
+                // The volume fade supplies the attack, without reference pitch flutter.
+                mode.phases.let { phases ->
+                    val anchor = (.20 / stepSeconds).toInt().coerceAtMost(phases.lastIndex)
+                    val earlier = (anchor - 2).coerceAtLeast(0)
+                    val velocity = if (anchor == earlier) 0.0 else
+                        (phases[anchor] - phases[earlier]) / ((anchor - earlier) * stepSeconds)
+                    doubleArrayOf(phases[anchor] + velocity * .025)
+                }
+            } else mode.phases
             val hz = actual * mode.ratio
             if (hz >= 20000) continue
             val rate = 1.0
@@ -86,12 +102,12 @@ object Music {
             var oscillatorCos = kotlin.math.cos(mode.phase)
             var nextPhaseFrame = 0
             for (i in levels.indices) {
-                if (mode.phases.isNotEmpty() && i >= nextPhaseFrame) {
-                    val position = (modelTime(i / sampleRate, rate) / stepSeconds).coerceAtMost(mode.phases.lastIndex.toDouble())
+                if (phaseTrack.isNotEmpty() && i >= nextPhaseFrame) {
+                    val position = (modelTime(i / sampleRate, rate) / stepSeconds).coerceAtMost(phaseTrack.lastIndex.toDouble())
                     val frame = position.toInt()
                     val fraction = position - frame
-                    val phase0 = mode.phases[frame]
-                    val phase1 = mode.phases[(frame + 1).coerceAtMost(mode.phases.lastIndex)]
+                    val phase0 = phaseTrack[frame]
+                    val phase1 = phaseTrack[(frame + 1).coerceAtMost(phaseTrack.lastIndex)]
                     val phase = step * i + phase0 * (1 - fraction) + phase1 * fraction
                     oscillatorSin = sin(phase)
                     oscillatorCos = kotlin.math.cos(phase)
@@ -100,7 +116,7 @@ object Music {
                     stepSin = sin(evolvingStep)
                     stepCos = kotlin.math.cos(evolvingStep)
                     val nextTime = (frame + 1) * stepSeconds
-                    nextPhaseFrame = if (frame >= mode.phases.lastIndex) Int.MAX_VALUE else
+                    nextPhaseFrame = if (frame >= phaseTrack.lastIndex) Int.MAX_VALUE else
                         kotlin.math.ceil((if (nextTime <= .03) nextTime else .03 + (nextTime - .03) / rate) * sampleRate).toInt()
                 }
                 output[start + i] += levels[i] * oscillatorSin
@@ -152,9 +168,8 @@ object Music {
             output[i] *= attack * attack * (3 - 2 * attack)
         }
         run {
-            // Preserve measured timbre motion rather than flattening the sustain.
-            // The two sections are an integer number of pitch periods apart;
-            // overlap the end with the pre-loop lead-in to join both value and slope.
+            // The stable harmonics complete an integer number of pitch periods.
+            // Crossfade the residual noise and join both waveform value and slope.
             val overlap = 11025
             for (i in 0 until overlap) {
                 val fraction = i.toDouble() / overlap
@@ -162,6 +177,33 @@ object Music {
                 val end = count - overlap + i
                 val beginning = introFrames - overlap + i
                 output[end] = output[end] * (1 - mix) + output[beginning] * mix
+            }
+        }
+        if (instrument == Instrument.HARMONIUM) {
+            // Model energy alone misses cancellation between differently phased
+            // loop sections. Level the actual mixed waveform after the join.
+            val energy = DoubleArray(count + 1)
+            for (i in output.indices) energy[i + 1] = energy[i] + output[i] * output[i]
+            val steady = (energy[count] - energy[introFrames]) / loopFrames
+            val windowCycles = kotlin.math.round(actual * .060).toInt().coerceAtLeast(8)
+            val windowFrames = kotlin.math.round(windowCycles * sampleRate / actual).toInt()
+            for (i in output.indices) {
+                val left = i - windowFrames / 2
+                val right = left + windowFrames
+                val localEnergy = if (i < introFrames) {
+                    energy[right.coerceAtMost(count)] - energy[left.coerceAtLeast(0)]
+                } else when {
+                    left < introFrames -> energy[right] - energy[introFrames] +
+                        energy[count] - energy[count - (introFrames - left)]
+                    right > count -> energy[count] - energy[left] +
+                        energy[introFrames + right - count] - energy[introFrames]
+                    else -> energy[right] - energy[left]
+                }
+                val correction = kotlin.math.sqrt(steady / (localEnergy / windowFrames)
+                    .coerceAtLeast(1e-12)).coerceIn(.5, 2.0)
+                val position = ((i / sampleRate - .25) / .40).coerceIn(0.0, 1.0)
+                val mix = position * position * (3.0 - 2.0 * position)
+                output[i] *= 1.0 + mix * (correction - 1.0)
             }
         }
         val rendered = output
@@ -175,7 +217,11 @@ object Music {
             val rms = kotlin.math.sqrt(energy / (rendered.size - introFrames)).coerceAtLeast(.00001)
             minOf(peakGain, .24 / rms)
         } else peakGain
-        return InstrumentTone(ShortArray(rendered.size) { pcmSample(rendered[it] * gain) },
+        // Fade once in PCM, with no timer-driven volume steps. The loop excludes
+        // these samples so holding a key never repeats the fade-in.
+        return InstrumentTone(ShortArray(rendered.size) {
+            pcmSample(rendered[it] * gain * (it / sampleRate).coerceAtMost(1.0))
+        },
             introFrames)
     }
 }

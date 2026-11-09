@@ -31,8 +31,9 @@ class TonePlayer(context: Context, private val onError: () -> Unit) : AutoClosea
         .setOnAudioFocusChangeListener { change -> if (change < 0) stop() }
         .build()
     private var track: AudioTrack? = null
+    private var trackVolume = 0f
+    private val releasing = mutableMapOf<AudioTrack, Runnable>()
     private var generation = 0
-    private var fadeIn: Runnable? = null
     private var pending: Triple<Int, Boolean, (Boolean) -> Unit>? = null
     @Volatile private var priorityMidi = -1
     @Volatile private var closed = false
@@ -124,21 +125,10 @@ class TonePlayer(context: Context, private val onError: () -> Unit) : AutoClosea
             // Play the attack once, then loop only the sustain.
             check(output.setLoopPoints(tone.loopStart, tone.pcm.size, -1) == AudioTrack.SUCCESS)
             val request = generation
-            output.setVolume(0f)
+            // The PCM contains the sample-accurate one-second fade-in.
+            output.setVolume(1f)
+            trackVolume = 1f
             output.play()
-            run {
-                val startedAt = SystemClock.elapsedRealtime()
-                val ramp = object : Runnable {
-                    override fun run() {
-                        if (closed || request != generation || track !== output) return
-                        val volume = ((SystemClock.elapsedRealtime() - startedAt) / 1000f).coerceIn(0f, 1f)
-                        output.setVolume(volume)
-                        if (volume < 1f) main.postDelayed(this, 10) else fadeIn = null
-                    }
-                }
-                fadeIn = ramp
-                main.postDelayed(ramp, 10)
-            }
             if (!sustain) main.postDelayed({ if (request == generation) stop() }, 3000)
             onStarted(true)
         } catch (error: Exception) {
@@ -150,22 +140,50 @@ class TonePlayer(context: Context, private val onError: () -> Unit) : AutoClosea
     }
 
     fun stop() {
-        fadeIn?.let { main.removeCallbacks(it) }
-        fadeIn = null
         generation++
         pending?.third?.invoke(false)
         pending = null
         priorityMidi = -1
-        track?.let { output ->
-            if (output.playState == AudioTrack.PLAYSTATE_PLAYING) output.stop()
-            output.release()
-        }
+        val output = track
+        val volume = trackVolume
         track = null
-        manager.abandonAudioFocusRequest(focus)
+        trackVolume = 0f
+        if (output != null && output.playState == AudioTrack.PLAYSTATE_PLAYING && volume > 0f) {
+            // A hard stop cuts the waveform at an arbitrary value and clicks.
+            // Retire this track separately so a new key can start immediately.
+            val startedAt = SystemClock.elapsedRealtime()
+            val release = object : Runnable {
+                override fun run() {
+                    val elapsed = SystemClock.elapsedRealtime() - startedAt
+                    val remaining = (1f - elapsed / 20f).coerceIn(0f, 1f)
+                    output.setVolume(volume * remaining * remaining)
+                    if (elapsed < 24) {
+                        main.postDelayed(this, 4)
+                    } else {
+                        output.stop()
+                        output.release()
+                        releasing.remove(output)
+                        if (track == null && pending == null && releasing.isEmpty())
+                            manager.abandonAudioFocusRequest(focus)
+                    }
+                }
+            }
+            releasing[output] = release
+            main.post(release)
+        } else {
+            output?.release()
+            if (releasing.isEmpty()) manager.abandonAudioFocusRequest(focus)
+        }
     }
 
     override fun close() {
         stop()
+        releasing.forEach { (output, release) ->
+            main.removeCallbacks(release)
+            output.release()
+        }
+        releasing.clear()
+        manager.abandonAudioFocusRequest(focus)
         closed = true
         worker.shutdownNow()
         main.removeCallbacksAndMessages(null)
