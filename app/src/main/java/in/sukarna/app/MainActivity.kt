@@ -107,15 +107,21 @@ class MainActivity : ComponentActivity() {
 private fun Patukarna(player: TonePlayer, onLanguageChange: () -> Unit) {
     val dark = isSystemInDarkTheme()
     val scheme = if (dark) darkColorScheme(
-        primary = Color(0xFFB8D6C4), background = Color(0xFF17251F),
+        primary = Color(0xFFB8D6C4), onPrimary = Color(0xFF12372B),
+        secondaryContainer = Color(0xFF263F59), onSecondaryContainer = Color(0xFFD6E8FF),
+        tertiaryContainer = Color(0xFF554222), onTertiaryContainer = Color(0xFFFFE2AD), background = Color(0xFF17251F),
         surface = Color(0xFF21342B), onSurface = Color(0xFFE9EBDF),
         onSurfaceVariant = Color(0xFFB9C0B3), outlineVariant = Color(0xFF3C4C41),
     ) else lightColorScheme(
-        primary = Green, background = Cream, surface = Color(0xFFFFFEF9),
+        primary = Green, onPrimary = Color.White,
+        secondaryContainer = Color(0xFFDCE9F8), onSecondaryContainer = Color(0xFF18334D),
+        tertiaryContainer = Color(0xFFF6E3BC), onTertiaryContainer = Color(0xFF48320F), background = Cream, surface = Color(0xFFFFFEF9),
         onSurface = Ink, onSurfaceVariant = Muted, outlineVariant = Line,
     )
     MaterialTheme(colorScheme = scheme) {
+        var instrument by remember { mutableStateOf(player.instrument) }
         var selected by rememberSaveable { mutableIntStateOf(-1) }
+        var saptak by rememberSaveable { mutableIntStateOf(0) }
         var page by rememberSaveable { mutableStateOf("home") }
         var playing by remember { mutableStateOf<Int?>(null) }
         var playCount by remember { mutableIntStateOf(0) }
@@ -123,14 +129,14 @@ private fun Patukarna(player: TonePlayer, onLanguageChange: () -> Unit) {
         LaunchedEffect(playCount, holding) { if (!holding) { delay(3000); playing = null } }
         fun play(offset: Int) {
             holding = false
-            player.play(Music.scales[selected].midi + offset)
+            player.play(Music.scales[selected].midi + saptak * 12 + offset)
             playing = offset
             playCount++
         }
         fun back() {
             player.stop(); playing = null; holding = false
             if (selected >= 0) selected = -1
-            else if (page == "scale_identification" || page == "note_identification") page = "training"
+            else if (page == "scale_identification" || page == "note_identification" || page == "saptak_identification") page = "training"
             else page = "home"
         }
         BackHandler(page != "home") { back() }
@@ -143,7 +149,7 @@ private fun Patukarna(player: TonePlayer, onLanguageChange: () -> Unit) {
                     if (page != "home") {
                         val backLabel = stringResource(when {
                             selected >= 0 -> R.string.back_to_scales
-                            page == "scale_identification" || page == "note_identification" -> R.string.back_to_training
+                            page == "scale_identification" || page == "note_identification" || page == "saptak_identification" -> R.string.back_to_training
                             else -> R.string.back_to_home
                         })
                         IconButton(onClick = { back() }, modifier = Modifier.size(48.dp)) {
@@ -174,22 +180,29 @@ private fun Patukarna(player: TonePlayer, onLanguageChange: () -> Unit) {
                 HorizontalDivider(color = scheme.outlineVariant, modifier = Modifier.padding(horizontal = 16.dp))
                 if (page == "home") {
                     CenteredActions {
+                        InstrumentDropdown(instrument) {
+                            player.selectInstrument(it)
+                            instrument = it
+                        }
                         Button(onClick = { page = "scales" }, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) {
                             Text(stringResource(R.string.scales), fontSize = 18.sp)
                         }
                         FilledTonalButton(onClick = { page = "training" }, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) {
                             Text(stringResource(R.string.training), fontSize = 18.sp)
                         }
-                        OutlinedButton(onClick = { page = "manual" }, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) {
+                        FilledTonalButton(onClick = { page = "manual" }, colors = thirdButtonColors(), modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) {
                             Text(stringResource(R.string.manual), fontSize = 18.sp)
                         }
                     }
                 } else if (page == "training") {
                     CenteredActions {
-                        Button(onClick = { page = "scale_identification" }, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) {
+                        Button(onClick = { page = "saptak_identification" }, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) {
+                            Text(stringResource(R.string.saptak_identification), fontSize = 18.sp)
+                        }
+                        FilledTonalButton(onClick = { page = "scale_identification" }, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) {
                             Text(stringResource(R.string.scale_identification), fontSize = 18.sp)
                         }
-                        FilledTonalButton(onClick = { page = "note_identification" }, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) {
+                        FilledTonalButton(onClick = { page = "note_identification" }, colors = thirdButtonColors(), modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) {
                             Text(stringResource(R.string.note_identification), fontSize = 18.sp)
                         }
                     }
@@ -197,6 +210,8 @@ private fun Patukarna(player: TonePlayer, onLanguageChange: () -> Unit) {
                     ScaleIdentificationPage(player)
                 } else if (page == "note_identification") {
                     NoteIdentificationPage(player)
+                } else if (page == "saptak_identification") {
+                    NoteIdentificationPage(player, saptakTraining = true)
                 } else if (page == "manual") {
                     CenteredActions {
                         Text(stringResource(R.string.manual), fontFamily = FontFamily.Serif, fontSize = 28.sp)
@@ -231,11 +246,14 @@ private fun Patukarna(player: TonePlayer, onLanguageChange: () -> Unit) {
                 } else if (selected < 0) {
                     ScalesPage { selected = it }
                 } else {
-                    SwarasPage(Music.scales[selected], playing, holding, ::play,
+                    SwarasPage(Music.scales[selected].copy(midi = Music.scales[selected].midi + saptak * 12), playing, holding, ::play,
+                        saptak = saptak, onSaptakChange = {
+                            player.stop(); playing = null; holding = false; saptak = it
+                        },
                         onHold = { offset ->
                             holding = true
                             playing = offset
-                            player.play(Music.scales[selected].midi + offset, sustain = true)
+                            player.play(Music.scales[selected].midi + saptak * 12 + offset, sustain = true)
                         },
                         onRelease = { offset ->
                             if (holding && playing == offset) {
@@ -261,7 +279,7 @@ private fun ScaleIdentificationPage(player: TonePlayer) {
             try {
                 remaining.snapTo(1f)
                 isPlaying = true
-                player.play(scale.midi, sustain = true)
+                if (!player.playUntilStarted(scale.midi)) return@LaunchedEffect
                 withContext(object : MotionDurationScale { override val scaleFactor = 1f }) {
                     remaining.animateTo(0f, animationSpec = tween(3000, easing = LinearEasing))
                 }
@@ -283,7 +301,7 @@ private fun ScaleIdentificationPage(player: TonePlayer) {
         Button(onClick = { playRequest++ }, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) {
             Text(stringResource(R.string.play), fontSize = 18.sp)
         }
-        FilledTonalButton(onClick = { revealed = !revealed }, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) {
+        FilledTonalButton(onClick = { revealed = !revealed }, colors = thirdButtonColors(), modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) {
             Text(stringResource(if (revealed) R.string.hide else R.string.reveal), fontSize = 18.sp)
         }
         Box(Modifier.fillMaxWidth().heightIn(min = 104.dp), contentAlignment = Alignment.Center) {
@@ -336,14 +354,16 @@ private fun PlaybackCountdown(remaining: Float, label: String? = null, onDismiss
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun NoteIdentificationPage(player: TonePlayer) {
-    var selectedScale by rememberSaveable { mutableIntStateOf(-1) }
-    var scaleIndex by rememberSaveable { mutableIntStateOf(kotlin.random.Random.nextInt(Music.scales.size)) }
+private fun NoteIdentificationPage(player: TonePlayer, saptakTraining: Boolean = false) {
+    var saptak by rememberSaveable { mutableIntStateOf(kotlin.random.Random.nextInt(-1, 2)) }
+    var selectedScale by rememberSaveable { mutableIntStateOf(if (saptakTraining) 0 else -1) }
+    var scaleIndex by rememberSaveable { mutableIntStateOf(if (saptakTraining) 0 else kotlin.random.Random.nextInt(Music.scales.size)) }
     var noteIndex by rememberSaveable { mutableIntStateOf(kotlin.random.Random.nextInt(12)) }
     var revealed by rememberSaveable { mutableStateOf(false) }
     var expanded by remember { mutableStateOf(false) }
     var playRequest by remember { mutableIntStateOf(0) }
     var stage by remember { mutableIntStateOf(0) }
+    var comparisonSaptak by remember { mutableStateOf<Int?>(null) }
     val remaining = remember { Animatable(1f) }
     val scale = Music.scales[scaleIndex]
 
@@ -351,21 +371,23 @@ private fun NoteIdentificationPage(player: TonePlayer) {
         player.stop()
         playRequest = 0
         stage = 0
+        comparisonSaptak = null
         selectedScale = selection
         scaleIndex = if (selection >= 0) selection else
             (scaleIndex + kotlin.random.Random.nextInt(1, Music.scales.size)) % Music.scales.size
         noteIndex = (noteIndex + kotlin.random.Random.nextInt(1, 12)) % 12
+        if (saptakTraining) saptak = kotlin.random.Random.nextInt(-1, 2)
         revealed = false
     }
 
-    LaunchedEffect(scaleIndex, noteIndex, playRequest) {
+    LaunchedEffect(scaleIndex, noteIndex, saptak, playRequest, comparisonSaptak) {
         if (playRequest > 0) {
             try {
                 withContext(object : MotionDurationScale { override val scaleFactor = 1f }) {
-                    for (part in 1..2) {
+                    for (part in (if (saptakTraining) 2..2 else 1..2)) {
                         remaining.snapTo(1f)
                         stage = part
-                        player.play(scale.midi + if (part == 1) 0 else noteIndex, sustain = true)
+                        if (!player.playUntilStarted(scale.midi + (if (saptakTraining) (comparisonSaptak ?: saptak) * 12 else 0) + (if (part == 1) 0 else noteIndex))) return@withContext
                         remaining.animateTo(0f, animationSpec = tween(3000, easing = LinearEasing))
                         player.stop()
                     }
@@ -392,7 +414,7 @@ private fun NoteIdentificationPage(player: TonePlayer) {
                 modifier = Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
             )
             ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                DropdownMenuItem(text = { Text(stringResource(R.string.random_scale)) },
+                if (!saptakTraining) DropdownMenuItem(text = { Text(stringResource(R.string.random_scale)) },
                     onClick = { expanded = false; refresh(-1) })
                 Music.scales.forEachIndexed { index, option ->
                     DropdownMenuItem(text = { Text(scaleLabel(option)) },
@@ -404,10 +426,10 @@ private fun NoteIdentificationPage(player: TonePlayer) {
         FilledTonalButton(onClick = { refresh() }, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) {
             Text(stringResource(R.string.refresh_note), fontSize = 18.sp)
         }
-        Button(onClick = { playRequest++ }, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) {
+        Button(onClick = { comparisonSaptak = null; playRequest++ }, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) {
             Text(stringResource(R.string.play), fontSize = 18.sp)
         }
-        FilledTonalButton(onClick = { revealed = !revealed }, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) {
+        FilledTonalButton(onClick = { revealed = !revealed }, colors = thirdButtonColors(), modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) {
             Text(stringResource(if (revealed) R.string.hide else R.string.reveal), fontSize = 18.sp)
         }
         Box(Modifier.fillMaxWidth().heightIn(min = 104.dp), contentAlignment = Alignment.Center) {
@@ -428,14 +450,27 @@ private fun NoteIdentificationPage(player: TonePlayer) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(listOf(kind, name).filter { it.isNotEmpty() }.joinToString(" "),
                         fontSize = 32.sp, color = MaterialTheme.colorScheme.primary)
+                    if (saptakTraining) Text(saptakLabel(saptak), fontSize = 24.sp)
                     Text(scaleLabel(scale), fontSize = 20.sp)
+                }
+            }
+        }
+        if (saptakTraining && revealed) {
+            (-1..1).filter { it != saptak }.forEachIndexed { index, otherSaptak ->
+                FilledTonalButton(
+                    onClick = { comparisonSaptak = otherSaptak; playRequest++ },
+                    colors = comparisonButtonColors(index),
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
+                ) {
+                    Text(stringResource(R.string.play_saptak, saptakLabel(otherSaptak)), fontSize = 18.sp)
                 }
             }
         }
     }
     if (stage != 0) {
         PlaybackCountdown(remaining.value,
-            label = stringResource(if (stage == 1) R.string.swara_sa else R.string.practice_swara),
+            label = comparisonSaptak?.let { saptakLabel(it) }
+                ?: stringResource(if (stage == 1) R.string.swara_sa else R.string.practice_swara),
             onDismiss = {
                 player.stop()
                 playRequest = 0
@@ -502,7 +537,7 @@ private fun ScaleIndicator(scale: Scale) {
 }
 
 @Composable
-private fun SwarasPage(scale: Scale, playing: Int?, holding: Boolean, onPlay: (Int) -> Unit, onHold: (Int) -> Unit, onRelease: (Int) -> Unit) {
+private fun SwarasPage(scale: Scale, playing: Int?, holding: Boolean, onPlay: (Int) -> Unit, saptak: Int, onSaptakChange: (Int) -> Unit, onHold: (Int) -> Unit, onRelease: (Int) -> Unit) {
     val colors = MaterialTheme.colorScheme
     LazyVerticalGrid(
         columns = GridCells.Fixed(1),
@@ -522,6 +557,9 @@ private fun SwarasPage(scale: Scale, playing: Int?, holding: Boolean, onPlay: (I
                     Text(stringResource(if (playing == 0) R.string.replay_sa else R.string.play_sa))
                 }
             }
+        }
+        item(span = { GridItemSpan(maxLineSpan) }) {
+            SaptakDropdown(saptak, onSaptakChange)
         }
         item(span = { GridItemSpan(maxLineSpan) }) {
             HarmoniumKeyboard(scale, playing, onPlay, onHold, onRelease)
@@ -676,6 +714,76 @@ private fun SoundMark(color: Color, modifier: Modifier) {
             val x = size.width * (0.1f + i * 0.2f)
             drawLine(color, Offset(x, size.height * (1 - h) / 2), Offset(x, size.height * (1 + h) / 2),
                 strokeWidth = size.width * 0.065f, cap = StrokeCap.Round)
+        }
+    }
+}
+
+@Composable
+private fun saptakLabel(saptak: Int): String = stringResource(when (saptak) {
+    -1 -> R.string.saptak_mandra
+    1 -> R.string.saptak_taar
+    else -> R.string.saptak_madhya
+})
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SaptakDropdown(selected: Int, onSelect: (Int) -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
+        OutlinedTextField(
+            value = saptakLabel(selected), onValueChange = {}, readOnly = true, singleLine = true,
+            label = { Text(stringResource(R.string.saptak)) },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+            modifier = Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
+        )
+        ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            for (option in -1..1) {
+                DropdownMenuItem(text = { Text(saptakLabel(option)) },
+                    onClick = { expanded = false; onSelect(option) })
+            }
+        }
+    }
+}
+
+@Composable
+private fun thirdButtonColors() = ButtonDefaults.filledTonalButtonColors(
+    containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+    contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+)
+
+@Composable
+private fun comparisonButtonColors(index: Int): ButtonColors {
+    val dark = isSystemInDarkTheme()
+    return ButtonDefaults.filledTonalButtonColors(
+        containerColor = if (index == 0) {
+            if (dark) Color(0xFF493454) else Color(0xFFEDDDF6)
+        } else {
+            if (dark) Color(0xFF57333C) else Color(0xFFF8DEE5)
+        },
+        contentColor = if (index == 0) {
+            if (dark) Color(0xFFF1DFFF) else Color(0xFF40234E)
+        } else {
+            if (dark) Color(0xFFFFDDE5) else Color(0xFF512632)
+        },
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun InstrumentDropdown(selected: Instrument, onSelect: (Instrument) -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
+        OutlinedTextField(
+            value = stringResource(selected.label), onValueChange = {}, readOnly = true, singleLine = true,
+            label = { Text(stringResource(R.string.instrument)) },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+            modifier = Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
+        )
+        ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            Instrument.entries.forEach { instrument ->
+                DropdownMenuItem(text = { Text(stringResource(instrument.label)) },
+                    onClick = { expanded = false; onSelect(instrument) })
+            }
         }
     }
 }
