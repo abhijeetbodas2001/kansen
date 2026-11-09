@@ -92,7 +92,7 @@ class MainActivity : ComponentActivity() {
             Toast.makeText(this, R.string.audio_error, Toast.LENGTH_SHORT).show()
         }
         setContent {
-            PatuKarna(player) {
+            Patukarna(player) {
                 val language = if (resources.configuration.locales[0].language == "mr") "en" else "mr"
                 getSharedPreferences("preferences", MODE_PRIVATE).edit().putString("language", language).apply()
                 recreate()
@@ -104,7 +104,7 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-private fun PatuKarna(player: TonePlayer, onLanguageChange: () -> Unit) {
+private fun Patukarna(player: TonePlayer, onLanguageChange: () -> Unit) {
     val dark = isSystemInDarkTheme()
     val scheme = if (dark) darkColorScheme(
         primary = Color(0xFFB8D6C4), background = Color(0xFF17251F),
@@ -157,7 +157,7 @@ private fun PatuKarna(player: TonePlayer, onLanguageChange: () -> Unit) {
                         Spacer(Modifier.width(4.dp))
                     } else {
                         Image(
-                            painter = painterResource(R.drawable.patu_karna_logo),
+                            painter = painterResource(R.drawable.patukarna_logo),
                             contentDescription = null,
                             modifier = Modifier.size(40.dp),
                         )
