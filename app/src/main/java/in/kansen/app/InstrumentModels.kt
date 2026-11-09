@@ -1,11 +1,14 @@
 package `in`.kansen.app
 
 import android.content.res.AssetManager
-import org.json.JSONArray
-import org.json.JSONObject
+import java.io.BufferedInputStream
+import java.io.DataInputStream
 import kotlin.math.abs
 
-data class SpectralMode(val ratio: Double, val phase: Double, val amplitudes: DoubleArray, val phases: DoubleArray = doubleArrayOf())
+data class SpectralMode(
+    val ratio: Double, val phase: Double, val amplitudes: DoubleArray,
+    val phases: DoubleArray = doubleArrayOf(), val pitchTracking: Double = 1.0,
+)
 data class InstrumentModel(
     val instrument: String,
     val midi: Int,
@@ -13,25 +16,44 @@ data class InstrumentModel(
     val modes: List<SpectralMode>,
     val noise: List<DoubleArray>,
     val noiseEdges: DoubleArray,
+    val referenceHz: Double = Music.frequency(midi),
 )
 
 class InstrumentModels(assets: AssetManager) {
-    private fun JSONArray.doubles() = DoubleArray(length()) { getDouble(it) }
+    private fun DataInputStream.doubles(): DoubleArray {
+        val count = readInt()
+        require(count in 0..20000) { "Invalid envelope length" }
+        return DoubleArray(count) { readFloat().toDouble() }
+    }
     private val models: List<InstrumentModel>
 
     init {
-        val array = JSONObject(assets.open("synthesis/instruments.json").bufferedReader().use { it.readText() })
-            .getJSONArray("models")
-        models = List(array.length()) { index ->
-            val item = array.getJSONObject(index)
-            val modes = item.getJSONArray("modes")
-            val noise = item.getJSONArray("noise")
-            InstrumentModel(item.getString("instrument"), item.getInt("midi"), item.getDouble("stepSeconds"),
-                List(modes.length()) { modeIndex ->
-                    val mode = modes.getJSONObject(modeIndex)
-                    SpectralMode(mode.getDouble("ratio"), mode.getDouble("phase"), mode.getJSONArray("amplitudes").doubles(),
-                        mode.optJSONArray("phases")?.doubles() ?: doubleArrayOf())
-                }, List(noise.length()) { noise.getJSONArray(it).doubles() }, item.getJSONArray("noiseEdges").doubles())
+        // Stream compact numeric parameters directly into arrays. A JSON tree
+        // temporarily multiplied the memory needed by the larger register bank.
+        models = DataInputStream(BufferedInputStream(assets.open("synthesis/instruments.bin"))).use { input ->
+            check(input.readInt() == 0x4b534e34) { "Invalid instrument bank" }
+            val count = input.readInt()
+            require(count in 1..128)
+            List(count) {
+                val instrument = input.readUTF()
+                val midi = input.readInt()
+                val referenceHz = input.readDouble()
+                val stepSeconds = input.readDouble()
+                val modeCount = input.readInt()
+                require(modeCount in 1..256)
+                val modes = List(modeCount) {
+                    val ratio = input.readDouble()
+                    val phase = input.readDouble()
+                    val tracking = input.readDouble()
+                    SpectralMode(ratio, phase, input.doubles(), input.doubles(), tracking)
+                }
+                val bandCount = input.readInt()
+                require(bandCount in 1..128)
+                val noise = List(bandCount) { input.doubles() }
+                val edges = input.doubles()
+                check(edges.size == bandCount + 1)
+                InstrumentModel(instrument, midi, stepSeconds, modes, noise, edges, referenceHz)
+            }
         }
     }
 
@@ -40,7 +62,7 @@ class InstrumentModels(assets: AssetManager) {
         val matching = models.filter { it.instrument == instrument.id }.sortedBy { it.midi }
         val lower = matching.lastOrNull { it.midi <= midi } ?: matching.first()
         val upper = matching.firstOrNull { it.midi >= midi } ?: matching.last()
-        if (lower === upper || instrument.percussive) return matching.minBy { abs(it.midi - midi) }
+        if (lower === upper) return lower
         val blend = (midi - lower.midi).toDouble() / (upper.midi - lower.midi)
         fun levels(a: DoubleArray?, b: DoubleArray?): DoubleArray {
             val size = maxOf(a?.size ?: 0, b?.size ?: 0)
@@ -59,7 +81,22 @@ class InstrumentModels(assets: AssetManager) {
             val highPhase = hi?.phase ?: lowPhase
             val phase = kotlin.math.atan2((1 - blend) * kotlin.math.sin(lowPhase) + blend * kotlin.math.sin(highPhase),
                 (1 - blend) * kotlin.math.cos(lowPhase) + blend * kotlin.math.cos(highPhase))
-            SpectralMode(ratio, phase, levels(lo?.amplitudes, hi?.amplitudes))
+            val phaseCount = maxOf(lo?.phases?.size ?: 0, hi?.phases?.size ?: 0)
+            val phases = DoubleArray(phaseCount)
+            val lowTrack = lo?.phases?.takeIf { it.isNotEmpty() } ?: hi?.phases
+            val highTrack = hi?.phases?.takeIf { it.isNotEmpty() } ?: lowTrack
+            val lowStart = lowTrack?.firstOrNull() ?: lowPhase
+            val highStart = highTrack?.firstOrNull() ?: highPhase
+            val start = kotlin.math.atan2((1 - blend) * kotlin.math.sin(lowStart) + blend * kotlin.math.sin(highStart),
+                (1 - blend) * kotlin.math.cos(lowStart) + blend * kotlin.math.cos(highStart))
+            for (i in phases.indices) {
+                // Blend unwrapped motion, avoiding phase flips when two profiles
+                // cross opposite angles during a sustained note.
+                val a = lowTrack?.getOrNull(i) ?: lowStart
+                val b = highTrack?.getOrNull(i) ?: highStart
+                phases[i] = start + (1 - blend) * (a - lowStart) + blend * (b - highStart)
+            }
+            SpectralMode(ratio, phase, levels(lo?.amplitudes, hi?.amplitudes), phases)
         }
         return InstrumentModel(instrument.id, midi, lower.stepSeconds, modes,
             lower.noise.indices.map { levels(lower.noise[it], upper.noise[it]) }, lower.noiseEdges)

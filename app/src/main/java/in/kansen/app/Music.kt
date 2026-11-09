@@ -7,12 +7,9 @@ import kotlin.math.sin
 data class Scale(val label: String, val note: String, val midi: Int, val white: Boolean)
 data class Swara(val name: String, val kind: String, val symbol: String)
 
-enum class Instrument(val id: String, val label: Int, val percussive: Boolean = false) {
+enum class Instrument(val id: String, val label: Int) {
     HARMONIUM("harmonium", R.string.instrument_harmonium),
-    FLUTE("flute", R.string.instrument_flute),
-    SITAR("sitar", R.string.instrument_sitar, true),
-    PURE_TONE("pure_tone", R.string.instrument_pure_tone),
-    TABLA("tabla", R.string.instrument_tabla, true);
+    PURE_TONE("pure_tone", R.string.instrument_pure_tone);
 
     companion object {
         fun fromId(id: String?): Instrument = entries.firstOrNull { it.id == id } ?: HARMONIUM
@@ -53,31 +50,24 @@ object Music {
     fun synthesize(midi: Int, instrument: Instrument, model: InstrumentModel? = null): InstrumentTone {
         val sampleRate = 44100.0
         val target = frequency(midi)
-        val percussive = instrument.percussive
         val loopCycles = kotlin.math.round(target * 1.5).toInt()
-        val loopFrames = if (percussive) 44100 else kotlin.math.round(sampleRate * loopCycles / target).toInt()
-        val actual = if (percussive) target else sampleRate * loopCycles / loopFrames
-        val introFrames = if (percussive) 0 else loopFrames
-        val count = if (percussive) 88200 else introFrames + loopFrames
+        val loopFrames = kotlin.math.round(sampleRate * loopCycles / target).toInt()
+        val actual = sampleRate * loopCycles / loopFrames
+        val introFrames = 28665 // 650 ms before the sustain loop
+        val count = introFrames + loopFrames
         val output = DoubleArray(count)
-        val start = if (percussive) introFrames else 0
+        val start = 0
         val stepSeconds = model?.stepSeconds ?: .02
+        fun modelTime(t: Double, rate: Double) = if (t <= .03) t else .03 + (t - .03) * rate
         val envelopeBuffer = DoubleArray(count - start)
-        fun envelope(values: DoubleArray): DoubleArray {
-            val sustainStart = (1.5 / stepSeconds).toInt().coerceAtMost(values.lastIndex)
-            val sustainEnd = (2.4 / stepSeconds).toInt().coerceAtMost(values.lastIndex)
-            val sustain = (sustainStart..sustainEnd).map { values[it] }.average()
+        fun envelope(values: DoubleArray, rate: Double = 1.0): DoubleArray {
             for (i in envelopeBuffer.indices) {
-                val t = i / sampleRate
+                val t = modelTime(i / sampleRate, rate)
                 val position = (t / stepSeconds).coerceAtMost(values.lastIndex.toDouble())
                 val left = position.toInt()
                 val fraction = position - left
                 val measured = values[left] * (1 - fraction) + values[(left + 1).coerceAtMost(values.lastIndex)] * fraction
-                envelopeBuffer[i] = if (percussive) measured else {
-                    val blend = ((t - 1.0) / .35).coerceIn(0.0, 1.0)
-                    val smooth = blend * blend * (3 - 2 * blend)
-                    measured * (1 - smooth) + sustain * smooth
-                }
+                envelopeBuffer[i] = measured
             }
             return envelopeBuffer
         }
@@ -87,7 +77,8 @@ object Music {
         for (mode in modes) {
             val hz = actual * mode.ratio
             if (hz >= 20000) continue
-            val levels = envelope(mode.amplitudes)
+            val rate = 1.0
+            val levels = envelope(mode.amplitudes, rate)
             val step = 2 * PI * hz / sampleRate
             var stepSin = sin(step)
             var stepCos = kotlin.math.cos(step)
@@ -96,7 +87,7 @@ object Music {
             var nextPhaseFrame = 0
             for (i in levels.indices) {
                 if (mode.phases.isNotEmpty() && i >= nextPhaseFrame) {
-                    val position = (i / sampleRate / stepSeconds).coerceAtMost(mode.phases.lastIndex.toDouble())
+                    val position = (modelTime(i / sampleRate, rate) / stepSeconds).coerceAtMost(mode.phases.lastIndex.toDouble())
                     val frame = position.toInt()
                     val fraction = position - frame
                     val phase0 = mode.phases[frame]
@@ -104,10 +95,13 @@ object Music {
                     val phase = step * i + phase0 * (1 - fraction) + phase1 * fraction
                     oscillatorSin = sin(phase)
                     oscillatorCos = kotlin.math.cos(phase)
-                    val evolvingStep = step + (phase1 - phase0) / (stepSeconds * sampleRate)
+                    val currentRate = if (i / sampleRate < .03) 1.0 else rate
+                    val evolvingStep = step + (phase1 - phase0) * currentRate / (stepSeconds * sampleRate)
                     stepSin = sin(evolvingStep)
                     stepCos = kotlin.math.cos(evolvingStep)
-                    nextPhaseFrame = kotlin.math.ceil((frame + 1) * stepSeconds * sampleRate).toInt()
+                    val nextTime = (frame + 1) * stepSeconds
+                    nextPhaseFrame = if (frame >= mode.phases.lastIndex) Int.MAX_VALUE else
+                        kotlin.math.ceil((if (nextTime <= .03) nextTime else .03 + (nextTime - .03) / rate) * sampleRate).toInt()
                 }
                 output[start + i] += levels[i] * oscillatorSin
                 val nextSin = oscillatorSin * stepCos + oscillatorCos * stepSin
@@ -117,9 +111,12 @@ object Music {
         }
         // Fresh band-limited stochastic excitation, shaped by measured residual energy.
         // The repeating noise bed is circular; it contains no copied waveform samples.
-        val random = kotlin.random.Random(midi * 31 + instrument.ordinal)
-        val white = DoubleArray(loopFrames) { random.nextDouble(-1.0, 1.0) }
+        val random = kotlin.random.Random(midi * 31 + when (instrument) {
+            Instrument.HARMONIUM -> 0
+            Instrument.PURE_TONE -> 3
+        })
         fun noiseBand(low: Double, high: Double): DoubleArray {
+            val white = DoubleArray(loopFrames) { random.nextDouble(-1.0, 1.0) }
             // A constant-Q biquad follows each measured residual band without
             // the broad overlap of the former low-pass difference filters.
             val center = kotlin.math.sqrt(low * high)
@@ -151,25 +148,34 @@ object Music {
         }
         for (i in start until count) {
             val t = (i - start) / sampleRate
-            val attack = (t / (if (percussive) .002 else .015)).coerceIn(0.0, 1.0)
-            val release = if (percussive) ((2.0 - t) / .08).coerceIn(0.0, 1.0) else 1.0
-            output[i] *= attack * attack * (3 - 2 * attack) * release * release * (3 - 2 * release)
+            val attack = (t / .015).coerceIn(0.0, 1.0)
+            output[i] *= attack * attack * (3 - 2 * attack)
         }
-        val rendered = if (percussive) {
-            // Let the previous stroke ring underneath the next, rather than cut
-            // every decay at one second. Loop the established two-stroke overlap.
-            DoubleArray(154350).also { sequence ->
-                for (hit in 0..2) {
-                    val offset = 22050 + hit * 44100
-                    for (i in output.indices) {
-                        if (offset + i >= sequence.size) break
-                        sequence[offset + i] += output[i]
-                    }
-                }
+        run {
+            // Preserve measured timbre motion rather than flattening the sustain.
+            // The two sections are an integer number of pitch periods apart;
+            // overlap the end with the pre-loop lead-in to join both value and slope.
+            val overlap = 11025
+            for (i in 0 until overlap) {
+                val fraction = i.toDouble() / overlap
+                val mix = fraction * fraction * (3 - 2 * fraction)
+                val end = count - overlap + i
+                val beginning = introFrames - overlap + i
+                output[end] = output[end] * (1 - mix) + output[beginning] * mix
             }
-        } else output
+        }
+        val rendered = output
         val peak = rendered.maxOf { kotlin.math.abs(it) }.coerceAtLeast(.001)
-        return InstrumentTone(ShortArray(rendered.size) { pcmSample(rendered[it] / peak * .96) },
-            if (percussive) 110250 else introFrames)
+        val peakGain = .96 / peak
+        val gain = if (instrument == Instrument.HARMONIUM) {
+            // Peak-only normalization made the nearly sinusoidal upper reeds
+            // much louder than the complex lower reeds. Balance sustained energy.
+            var energy = 0.0
+            for (i in introFrames until rendered.size) energy += rendered[i] * rendered[i]
+            val rms = kotlin.math.sqrt(energy / (rendered.size - introFrames)).coerceAtLeast(.00001)
+            minOf(peakGain, .24 / rms)
+        } else peakGain
+        return InstrumentTone(ShortArray(rendered.size) { pcmSample(rendered[it] * gain) },
+            introFrames)
     }
 }

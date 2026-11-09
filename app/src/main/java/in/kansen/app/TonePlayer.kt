@@ -38,7 +38,11 @@ class TonePlayer(context: Context, private val onError: () -> Unit) : AutoClosea
     @Volatile private var closed = false
     @Volatile private var bankGeneration = 0
 
-    init { preload(instrument) }
+    init {
+        // Migrate an unavailable saved instrument to the default.
+        preferences.edit().putString("instrument", instrument.id).apply()
+        preload(instrument)
+    }
 
     fun selectInstrument(selection: Instrument) {
         if (closed || selection == instrument) return
@@ -59,7 +63,8 @@ class TonePlayer(context: Context, private val onError: () -> Unit) : AutoClosea
                 val requested = priorityMidi
                 val midi = if (remaining.remove(requested)) requested else remaining.removeAt(0)
                 try {
-                    val tone = Music.synthesize(midi, selection, models.forNote(selection, midi))
+                    val model = if (selection == Instrument.PURE_TONE) null else models.forNote(selection, midi)
+                    val tone = Music.synthesize(midi, selection, model)
                     main.post {
                         if (!closed && bank == bankGeneration) {
                             samples[midi] = tone
@@ -116,13 +121,12 @@ class TonePlayer(context: Context, private val onError: () -> Unit) : AutoClosea
             track = output
             check(output.state != AudioTrack.STATE_UNINITIALIZED)
             check(output.write(tone.pcm, 0, tone.pcm.size) == tone.pcm.size)
-            // Percussion: hits at 0.5/1.5/2.5s, then loop the overlapping decays.
-            // Other instruments: play the attack once, then loop only the sustain.
+            // Play the attack once, then loop only the sustain.
             check(output.setLoopPoints(tone.loopStart, tone.pcm.size, -1) == AudioTrack.SUCCESS)
             val request = generation
-            output.setVolume(if (instrument.percussive) 1f else 0f)
+            output.setVolume(0f)
             output.play()
-            if (!instrument.percussive) {
+            run {
                 val startedAt = SystemClock.elapsedRealtime()
                 val ramp = object : Runnable {
                     override fun run() {

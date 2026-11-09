@@ -9,31 +9,14 @@ and stochastic noise. Measurement script: tools/analyze_instruments.py.
 Harmonium: Donya Quick, "Harmonium Samples - All Keys and Drones", recorded at
 Yale University's Euterpea Studio. Original: CC0 1.0.
 https://freesound.org/people/donyaquick/sounds/330410/
-Ten C3–D5 reference excerpts prepared by Nicholaus P. Brosowsky / tonejs-instruments,
+Twenty-six C3–D5 reference excerpts prepared by Nicholaus P. Brosowsky / tonejs-instruments,
 whose distributed samples are CC BY 3.0.
 https://github.com/nbrosowsky/tonejs-instruments/tree/master/samples/harmonium
 
-Flute: Versilian Studios (VSCO 2), Ten C4–C7 reference excerpts distributed by
-Nicholaus P. Brosowsky / tonejs-instruments under CC BY 3.0.
-https://github.com/nbrosowsky/tonejs-instruments/tree/master/samples/flute
-https://github.com/nbrosowsky/tonejs-instruments/blob/master/sample-source-info.txt
-https://github.com/nbrosowsky/tonejs-instruments/blob/master/LICENSE.md
-This is an orchestral flute reference, not a bansuri recording.
+Harmonium notes above D5 use a synthetic extension that preserves the measured
+body spectral envelope. Reference input hashes are recorded in sources.json.
 
-Sitar: zgump, "Sitar 02.wav", Freesound 87436, CC0 1.0.
-Analysis uses the publicly available high-quality MP3 preview.
-https://freesound.org/people/zgump/sounds/87436/
-The source labels the sound as sitar but does not document its recording setup.
-
-Tabla: dio_333, tabla_na_o (Freesound 130422), as distributed and trimmed
-by Sonic Pi. CC0 1.0. This is an open na stroke.
-https://github.com/sonic-pi-net/sonic-pi/blob/dev/etc/samples/README.md
-https://github.com/sonic-pi-net/sonic-pi/blob/dev/etc/samples/tabla_na_o.flac
-
-Licenses:
-CC BY 3.0: https://creativecommons.org/licenses/by/3.0/
-CC0 1.0: https://creativecommons.org/publicdomain/zero/1.0/
-Measured model data derived from CC BY sources is distributed under CC BY 3.0.
+Harmonium model data is distributed under CC BY 3.0:
+https://creativecommons.org/licenses/by/3.0/
+Original CC0 reference: https://creativecommons.org/publicdomain/zero/1.0/
 Credit does not imply endorsement by the reference authors.
-
-Reference input SHA-256 hashes are recorded in instruments.json.
