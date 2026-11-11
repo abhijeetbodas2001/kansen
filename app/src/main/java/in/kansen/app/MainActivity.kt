@@ -9,9 +9,6 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
@@ -28,6 +25,12 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.core.view.WindowCompat
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
@@ -42,8 +45,6 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.MotionDurationScale
-import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -65,7 +66,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import java.util.Locale
 
 private val Cream = Color(0xFFFAF8F2)
@@ -92,10 +92,9 @@ class MainActivity : ComponentActivity() {
             Toast.makeText(this, R.string.audio_error, Toast.LENGTH_SHORT).show()
         }
         setContent {
-            Kansen(player) {
-                val language = if (resources.configuration.locales[0].language == "mr") "en" else "mr"
+            Kansen(player) { language ->
                 getSharedPreferences("preferences", MODE_PRIVATE).edit().putString("language", language).apply()
-                recreate()
+                if (resources.configuration.locales[0].language != language) recreate()
             }
         }
     }
@@ -104,8 +103,22 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-private fun Kansen(player: TonePlayer, onLanguageChange: () -> Unit) {
-    val dark = isSystemInDarkTheme()
+private fun Kansen(player: TonePlayer, onLanguageChange: (String) -> Unit) {
+    val context = LocalContext.current
+    val preferences = remember(context) { context.getSharedPreferences("preferences", Context.MODE_PRIVATE) }
+    var theme by remember { mutableStateOf(preferences.getString("theme", "system") ?: "system") }
+    val dark = when (theme) {
+        "light" -> false
+        "dark" -> true
+        else -> isSystemInDarkTheme()
+    }
+    val view = LocalView.current
+    SideEffect {
+        WindowCompat.getInsetsController((context as ComponentActivity).window, view).apply {
+            isAppearanceLightStatusBars = !dark
+            isAppearanceLightNavigationBars = !dark
+        }
+    }
     val scheme = if (dark) darkColorScheme(
         primary = Color(0xFFB8D6C4), onPrimary = Color(0xFF12372B),
         secondaryContainer = Color(0xFF263F59), onSecondaryContainer = Color(0xFFD6E8FF),
@@ -137,6 +150,7 @@ private fun Kansen(player: TonePlayer, onLanguageChange: () -> Unit) {
             player.stop(); playing = null; holding = false
             if (selected >= 0) selected = -1
             else if (page == "scale_identification" || page == "note_identification" || page == "saptak_identification") page = "training"
+            else if (page == "manual") page = "settings"
             else page = "home"
         }
         BackHandler(page != "home") { back() }
@@ -150,6 +164,7 @@ private fun Kansen(player: TonePlayer, onLanguageChange: () -> Unit) {
                         val backLabel = stringResource(when {
                             selected >= 0 -> R.string.back_to_scales
                             page == "scale_identification" || page == "note_identification" || page == "saptak_identification" -> R.string.back_to_training
+                            page == "manual" -> R.string.back_to_settings
                             else -> R.string.back_to_home
                         })
                         IconButton(onClick = { back() }, modifier = Modifier.size(48.dp)) {
@@ -169,29 +184,92 @@ private fun Kansen(player: TonePlayer, onLanguageChange: () -> Unit) {
                         )
                         Spacer(Modifier.width(10.dp))
                     }
-                    Text(stringResource(R.string.app_name), fontFamily = FontFamily.Serif, fontSize = 24.sp, fontWeight = FontWeight.Medium)
-                    Spacer(Modifier.weight(1f))
-                    val switchLabel = stringResource(R.string.switch_language_description)
-                    OutlinedButton(onClick = onLanguageChange, contentPadding = PaddingValues(horizontal = 12.dp),
-                        modifier = Modifier.semantics { contentDescription = switchLabel }) {
-                        Text(stringResource(R.string.language_switch), fontSize = 13.sp)
+                    val pagePath = when (page) {
+                        "scales" -> listOfNotNull(
+                            stringResource(R.string.scales),
+                            if (selected >= 0) scaleLabel(Music.scales[selected]) else null,
+                        )
+                        "training" -> listOf(stringResource(R.string.training))
+                        "scale_identification", "note_identification", "saptak_identification" -> listOf(
+                            stringResource(R.string.training),
+                            stringResource(when (page) {
+                                "scale_identification" -> R.string.scale_identification
+                                "note_identification" -> R.string.note_identification
+                                else -> R.string.saptak_identification
+                            }),
+                        )
+                        "settings" -> listOf(stringResource(R.string.settings))
+                        "manual" -> listOf(stringResource(R.string.settings), stringResource(R.string.manual))
+                        else -> listOf(stringResource(R.string.home))
                     }
+                    Text(
+                        (listOf(stringResource(R.string.app_name)) + pagePath).joinToString(" / "),
+                        modifier = Modifier.weight(1f),
+                        fontFamily = FontFamily.Serif,
+                        fontSize = 18.sp,
+                        lineHeight = 24.sp,
+                        fontWeight = FontWeight.Medium,
+                    )
+
                 }
                 HorizontalDivider(color = scheme.outlineVariant, modifier = Modifier.padding(horizontal = 16.dp))
                 if (page == "home") {
                     CenteredActions {
-                        InstrumentDropdown(instrument) {
-                            player.selectInstrument(it)
-                            instrument = it
-                        }
                         Button(onClick = { page = "scales" }, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) {
-                            Text(stringResource(R.string.scales), fontSize = 18.sp)
+                            Text(stringResource(R.string.all_scales), fontSize = 18.sp)
                         }
                         FilledTonalButton(onClick = { page = "training" }, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) {
                             Text(stringResource(R.string.training), fontSize = 18.sp)
                         }
-                        FilledTonalButton(onClick = { page = "manual" }, colors = thirdButtonColors(), modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) {
-                            Text(stringResource(R.string.manual), fontSize = 18.sp)
+                        FilledTonalButton(onClick = { page = "settings" }, colors = thirdButtonColors(),
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) {
+                            Text(stringResource(R.string.settings), fontSize = 18.sp)
+                        }
+                    }
+                } else if (page == "settings") {
+                    Column(
+                        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(24.dp),
+                    ) {
+                        SettingsSection(stringResource(R.string.settings_sound)) {
+                            PreferencePicker(
+                                title = stringResource(R.string.instrument),
+                                selected = instrument.name,
+                                options = Instrument.entries.map { it.name to stringResource(it.label) },
+                                onSelect = { value ->
+                                    val choice = Instrument.valueOf(value)
+                                    player.selectInstrument(choice)
+                                    instrument = choice
+                                },
+                            )
+                        }
+                        SettingsSection(stringResource(R.string.settings_preferences)) {
+                            PreferencePicker(
+                                title = stringResource(R.string.language),
+                                selected = LocalConfiguration.current.locales[0].language,
+                                options = listOf("mr" to "मराठी", "en" to "English"),
+                                onSelect = onLanguageChange,
+                            )
+                            HorizontalDivider(Modifier.padding(horizontal = 16.dp), color = scheme.outlineVariant)
+                            PreferencePicker(
+                                title = stringResource(R.string.theme),
+                                selected = theme,
+                                options = listOf(
+                                    "light" to stringResource(R.string.theme_light),
+                                    "dark" to stringResource(R.string.theme_dark),
+                                    "system" to stringResource(R.string.theme_system),
+                                ),
+                                onSelect = {
+                                    theme = it
+                                    preferences.edit().putString("theme", it).apply()
+                                },
+                            )
+                        }
+                        SettingsSection(stringResource(R.string.settings_help)) {
+                            SettingsRow(
+                                title = stringResource(R.string.manual),
+                                onClick = { page = "manual" },
+                            )
                         }
                     }
                 } else if (page == "training") {
@@ -215,27 +293,25 @@ private fun Kansen(player: TonePlayer, onLanguageChange: () -> Unit) {
                 } else if (page == "manual") {
                     CenteredActions {
                         Text(stringResource(R.string.manual), fontFamily = FontFamily.Serif, fontSize = 28.sp)
-                        OutlinedCard(Modifier.fillMaxWidth()) {
-                            SelectionContainer {
-                                Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(24.dp)) {
-                                    stringResource(R.string.manual_body).split("\n\n").forEachIndexed { index, section ->
-                                        if (index > 0) HorizontalDivider(color = scheme.outlineVariant)
-                                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                                            Text(section.substringBefore('\n'),
-                                                style = MaterialTheme.typography.titleMedium,
-                                                fontWeight = FontWeight.SemiBold,
-                                                color = scheme.primary,
-                                                modifier = Modifier.semantics { heading() })
-                                            section.substringAfter('\n').split('\n').forEach { paragraph ->
-                                                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                                    if (paragraph.startsWith("• ")) {
-                                                        Text("•", color = scheme.primary, lineHeight = 26.sp)
-                                                    }
-                                                    Text(paragraph.removePrefix("• "),
-                                                        modifier = Modifier.weight(1f),
-                                                        style = MaterialTheme.typography.bodyLarge,
-                                                        lineHeight = 26.sp)
+                        SelectionContainer {
+                            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(24.dp)) {
+                                stringResource(R.string.manual_body).split("\n\n").forEachIndexed { index, section ->
+                                    if (index > 0) HorizontalDivider(color = scheme.outlineVariant)
+                                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                        Text(section.substringBefore('\n'),
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = scheme.primary,
+                                            modifier = Modifier.semantics { heading() })
+                                        section.substringAfter('\n').split('\n').forEach { paragraph ->
+                                            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                                if (paragraph.startsWith("• ")) {
+                                                    Text("•", color = scheme.primary, lineHeight = 26.sp)
                                                 }
+                                                Text(paragraph.removePrefix("• "),
+                                                    modifier = Modifier.weight(1f),
+                                                    style = MaterialTheme.typography.bodyLarge,
+                                                    lineHeight = 26.sp)
                                             }
                                         }
                                     }
@@ -267,43 +343,123 @@ private fun Kansen(player: TonePlayer, onLanguageChange: () -> Unit) {
 }
 
 @Composable
+private fun SettingsSection(title: String, content: @Composable ColumnScope.() -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(title, modifier = Modifier.padding(horizontal = 16.dp).semantics { heading() },
+            style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+        Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surface) {
+            Column(Modifier.fillMaxWidth(), content = content)
+        }
+    }
+}
+
+@Composable
+private fun SettingsRow(
+    title: String,
+    value: String? = null,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    ListItem(
+        headlineContent = { Text(title, style = MaterialTheme.typography.titleMedium) },
+        supportingContent = value?.let { { Text(it, style = MaterialTheme.typography.bodyMedium) } },
+        trailingContent = {
+            Icon(painterResource(R.drawable.ic_chevron_right), contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
+        },
+        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surface),
+        modifier = modifier.fillMaxWidth().clickable(role = Role.Button, onClick = onClick)
+            .padding(vertical = 6.dp),
+    )
+}
+
+@Composable
+private fun PreferencePicker(
+    title: String,
+    selected: String,
+    options: List<Pair<String, String>>,
+    onSelect: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    SettingsRow(
+        title = title,
+        value = options.firstOrNull { it.first == selected }?.second,
+        onClick = { expanded = true },
+        modifier = modifier,
+    )
+    if (expanded) {
+        AlertDialog(
+            onDismissRequest = { expanded = false },
+            title = { Text(title) },
+            text = {
+                Column(Modifier.fillMaxWidth().selectableGroup()) {
+                    options.forEach { (value, label) ->
+                        Row(
+                            Modifier.fillMaxWidth().heightIn(min = 56.dp)
+                                .selectable(selected = selected == value, role = Role.RadioButton,
+                                    onClick = { expanded = false; onSelect(value) })
+                                .padding(horizontal = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            RadioButton(selected = selected == value, onClick = null)
+                            Spacer(Modifier.width(12.dp))
+                            Text(label, fontSize = 18.sp)
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+        )
+    }
+}
+
+@Composable
 private fun ScaleIdentificationPage(player: TonePlayer) {
     var scaleIndex by rememberSaveable { mutableIntStateOf(kotlin.random.Random.nextInt(Music.scales.size)) }
     var revealed by rememberSaveable { mutableStateOf(false) }
-    var playRequest by remember { mutableIntStateOf(0) }
-    var isPlaying by remember { mutableStateOf(false) }
-    val remaining = remember { Animatable(1f) }
+    var heardSa by rememberSaveable { mutableStateOf(false) }
+    var heldKey by remember { mutableStateOf<Int?>(null) }
     val scale = Music.scales[scaleIndex]
-    LaunchedEffect(scaleIndex, playRequest) {
-        if (playRequest > 0) {
-            try {
-                remaining.snapTo(1f)
-                isPlaying = true
-                if (!player.playUntilStarted(scale.midi)) return@LaunchedEffect
-                withContext(object : MotionDurationScale { override val scaleFactor = 1f }) {
-                    remaining.animateTo(0f, animationSpec = tween(3000, easing = LinearEasing))
-                }
-            } finally {
-                player.stop()
-                isPlaying = false
-            }
-        }
-    }
+    DisposableEffect(player) { onDispose { player.stop() } }
     CenteredActions {
-        FilledTonalButton(onClick = {
-            player.stop()
-            playRequest = 0
-            scaleIndex = (scaleIndex + kotlin.random.Random.nextInt(1, Music.scales.size)) % Music.scales.size
-            revealed = false
-        }, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) {
-            Text(stringResource(R.string.refresh), fontSize = 18.sp)
+        HoldPlayButton(stringResource(R.string.play), scale.midi, heldKey == -1,
+            onHold = {
+                heldKey = -1
+                player.play(scale.midi, sustain = true) { started -> if (started) heardSa = true }
+            },
+            onRelease = { if (heldKey == -1) { heldKey = null; player.stop() } },
+            modifier = Modifier.fillMaxWidth())
+        IdentificationActions(
+            refreshLabel = stringResource(R.string.refresh),
+            revealed = revealed,
+            enabled = heardSa,
+            onRefresh = {
+                player.stop()
+                heldKey = null
+                scaleIndex = (scaleIndex + kotlin.random.Random.nextInt(1, Music.scales.size)) % Music.scales.size
+                revealed = false
+                heardSa = false
+            },
+            onReveal = { revealed = !revealed },
+        )
+        val playKey: (Int) -> Unit = { index ->
+            heldKey = index
+            player.play(scale.midi + index, sustain = true)
         }
-        Button(onClick = { playRequest++ }, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) {
-            Text(stringResource(R.string.play), fontSize = 18.sp)
-        }
-        FilledTonalButton(onClick = { revealed = !revealed }, colors = thirdButtonColors(), modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) {
-            Text(stringResource(if (revealed) R.string.hide else R.string.reveal), fontSize = 18.sp)
-        }
+        HarmoniumKeyboard(
+            scale = scale,
+            playing = heldKey?.takeIf { it >= 0 },
+            onPlay = { index ->
+                if (heldKey == index) { heldKey = null; player.stop() }
+                else playKey(index)
+            },
+            onHold = playKey,
+            onRelease = { index ->
+                if (heldKey == index) { heldKey = null; player.stop() }
+            },
+            noteCount = 12,
+        )
         Box(Modifier.fillMaxWidth().heightIn(min = 104.dp), contentAlignment = Alignment.Center) {
             if (revealed) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -314,42 +470,79 @@ private fun ScaleIdentificationPage(player: TonePlayer) {
             }
         }
     }
-    if (isPlaying) {
-        PlaybackCountdown(remaining.value, onDismiss = {
-            player.stop()
-            playRequest = 0
-            isPlaying = false
-        })
+}
+
+@Composable
+private fun IdentificationActions(
+    refreshLabel: String,
+    revealed: Boolean,
+    enabled: Boolean,
+    onRefresh: () -> Unit,
+    onReveal: () -> Unit,
+) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        FilledTonalButton(
+            onClick = onRefresh,
+            enabled = enabled,
+            modifier = Modifier.weight(1f).heightIn(min = 56.dp),
+            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
+        ) {
+            Icon(painterResource(R.drawable.ic_refresh), contentDescription = null, modifier = Modifier.size(22.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(refreshLabel, fontSize = 18.sp)
+        }
+        FilledTonalButton(
+            onClick = onReveal,
+            enabled = enabled,
+            colors = thirdButtonColors(),
+            modifier = Modifier.weight(1f).heightIn(min = 56.dp),
+            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
+        ) {
+            Icon(painterResource(if (revealed) R.drawable.ic_hide else R.drawable.ic_reveal),
+                contentDescription = null, modifier = Modifier.size(22.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(stringResource(if (revealed) R.string.hide else R.string.reveal), fontSize = 18.sp)
+        }
     }
 }
 
 @Composable
-private fun PlaybackCountdown(remaining: Float, label: String? = null, onDismiss: () -> Unit) {
-        Dialog(onDismissRequest = onDismiss) {
-            Surface(shape = RoundedCornerShape(28.dp), tonalElevation = 6.dp) {
-                Column(Modifier.width(200.dp).padding(vertical = 32.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    if (label != null) Text(label, fontSize = 18.sp)
-                    Box(Modifier.size(136.dp), contentAlignment = Alignment.Center) {
-                    val countdownDescription = stringResource(R.string.listen)
-                    CircularProgressIndicator(
-                        progress = { remaining },
-                        modifier = Modifier.size(112.dp).semantics {
-                            contentDescription = countdownDescription
-                        },
-                        strokeWidth = 8.dp,
-                    )
-                    Text(
-                        text = kotlin.math.ceil(remaining * 3).toInt().coerceIn(1, 3).toString(),
-                        fontSize = 36.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                    }
+private fun HoldPlayButton(
+    label: String,
+    midi: Int,
+    held: Boolean,
+    onHold: () -> Unit,
+    onRelease: () -> Unit,
+    modifier: Modifier = Modifier,
+    colors: ButtonColors = ButtonDefaults.buttonColors(),
+) {
+    val holdCallback by rememberUpdatedState(onHold)
+    val releaseCallback by rememberUpdatedState(onRelease)
+    Button(
+        // Accessibility activation toggles playback; touch plays only while held.
+        onClick = { if (held) onRelease() else onHold() },
+        colors = if (held) colors.copy(containerColor = colors.containerColor.copy(alpha = 0.75f)) else colors,
+        modifier = modifier.heightIn(min = 56.dp).pointerInput(midi) {
+            awaitEachGesture {
+                val down = awaitFirstDown(pass = PointerEventPass.Initial)
+                down.consume()
+                holdCallback()
+                try {
+                    do {
+                        val event = awaitPointerEvent(PointerEventPass.Initial)
+                        val pointer = event.changes.firstOrNull { it.id == down.id }
+                        event.changes.forEach { it.consume() }
+                    } while (pointer != null && pointer.pressed)
+                } finally {
+                    releaseCallback()
                 }
             }
-        }
+        },
+    ) {
+        Icon(painterResource(R.drawable.ic_play), contentDescription = null, modifier = Modifier.size(22.dp))
+        Spacer(Modifier.width(8.dp))
+        Text(label, fontSize = 18.sp)
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -360,43 +553,24 @@ private fun NoteIdentificationPage(player: TonePlayer, saptakTraining: Boolean =
     var scaleIndex by rememberSaveable { mutableIntStateOf(if (saptakTraining) 0 else kotlin.random.Random.nextInt(Music.scales.size)) }
     var noteIndex by rememberSaveable { mutableIntStateOf(kotlin.random.Random.nextInt(12)) }
     var revealed by rememberSaveable { mutableStateOf(false) }
+    var heardSa by rememberSaveable { mutableStateOf(false) }
+    var heardNote by rememberSaveable { mutableStateOf(false) }
     var expanded by remember { mutableStateOf(false) }
-    var playRequest by remember { mutableIntStateOf(0) }
-    var stage by remember { mutableIntStateOf(0) }
-    var comparisonSaptak by remember { mutableStateOf<Int?>(null) }
-    val remaining = remember { Animatable(1f) }
+    var heldPart by remember { mutableStateOf<Int?>(null) }
+    DisposableEffect(player) { onDispose { player.stop() } }
     val scale = Music.scales[scaleIndex]
 
     fun refresh(selection: Int = selectedScale) {
         player.stop()
-        playRequest = 0
-        stage = 0
-        comparisonSaptak = null
+        heldPart = null
         selectedScale = selection
         scaleIndex = if (selection >= 0) selection else
             (scaleIndex + kotlin.random.Random.nextInt(1, Music.scales.size)) % Music.scales.size
         noteIndex = (noteIndex + kotlin.random.Random.nextInt(1, 12)) % 12
         if (saptakTraining) saptak = kotlin.random.Random.nextInt(-1, 2)
         revealed = false
-    }
-
-    LaunchedEffect(scaleIndex, noteIndex, saptak, playRequest, comparisonSaptak) {
-        if (playRequest > 0) {
-            try {
-                withContext(object : MotionDurationScale { override val scaleFactor = 1f }) {
-                    for (part in (if (saptakTraining) 2..2 else 1..2)) {
-                        remaining.snapTo(1f)
-                        stage = part
-                        if (!player.playUntilStarted(scale.midi + (if (saptakTraining) (comparisonSaptak ?: saptak) * 12 else 0) + (if (part == 1) 0 else noteIndex))) return@withContext
-                        remaining.animateTo(0f, animationSpec = tween(3000, easing = LinearEasing))
-                        player.stop()
-                    }
-                }
-            } finally {
-                player.stop()
-                stage = 0
-            }
-        }
+        heardSa = false
+        heardNote = false
     }
 
     CenteredActions {
@@ -423,14 +597,70 @@ private fun NoteIdentificationPage(player: TonePlayer, saptakTraining: Boolean =
                 }
             }
         }
-        FilledTonalButton(onClick = { refresh() }, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) {
-            Text(stringResource(R.string.refresh_note), fontSize = 18.sp)
+        if (saptakTraining) {
+            val midi = scale.midi + saptak * 12 + noteIndex
+            HoldPlayButton(
+                stringResource(R.string.play), midi, heldPart == 0,
+                onHold = {
+                    heldPart = 0
+                    player.play(midi, sustain = true) { started -> if (started) heardNote = true }
+                },
+                onRelease = { if (heldPart == 0) { heldPart = null; player.stop() } },
+                modifier = Modifier.fillMaxWidth(),
+            )
+        } else {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                for (part in 0..1) {
+                    val midi = scale.midi + if (part == 0) 0 else noteIndex
+                    HoldPlayButton(
+                        stringResource(if (part == 0) R.string.listen_sa else R.string.listen_swara),
+                        midi, heldPart == part,
+                        onHold = {
+                            heldPart = part
+                            player.play(midi, sustain = true) { started ->
+                                if (started) {
+                                    if (part == 0) heardSa = true else heardNote = true
+                                }
+                            }
+                        },
+                        onRelease = { if (heldPart == part) { heldPart = null; player.stop() } },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+            }
         }
-        Button(onClick = { comparisonSaptak = null; playRequest++ }, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) {
-            Text(stringResource(R.string.play), fontSize = 18.sp)
-        }
-        FilledTonalButton(onClick = { revealed = !revealed }, colors = thirdButtonColors(), modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) {
-            Text(stringResource(if (revealed) R.string.hide else R.string.reveal), fontSize = 18.sp)
+        IdentificationActions(
+            refreshLabel = stringResource(R.string.refresh_note),
+            revealed = revealed,
+            enabled = heardNote && (saptakTraining || heardSa),
+            onRefresh = { refresh() },
+            onReveal = {
+                if (saptakTraining && (heldPart ?: -1) >= 2) {
+                    heldPart = null
+                    player.stop()
+                }
+                revealed = !revealed
+            },
+        )
+        if (!saptakTraining) {
+            val playKey: (Int) -> Unit = { index ->
+                heldPart = index + 2
+                player.play(scale.midi + index, sustain = true)
+            }
+            HarmoniumKeyboard(
+                scale = scale,
+                // Only the reference Sa and directly pressed keys reveal a highlight.
+                playing = if (heldPart == 0) 0 else heldPart?.takeIf { it >= 2 }?.minus(2),
+                onPlay = { index ->
+                    if (heldPart == index + 2) { heldPart = null; player.stop() }
+                    else playKey(index)
+                },
+                onHold = playKey,
+                onRelease = { index ->
+                    if (heldPart == index + 2) { heldPart = null; player.stop() }
+                },
+                noteCount = 12,
+            )
         }
         Box(Modifier.fillMaxWidth().heightIn(min = 104.dp), contentAlignment = Alignment.Center) {
             if (revealed) {
@@ -457,25 +687,18 @@ private fun NoteIdentificationPage(player: TonePlayer, saptakTraining: Boolean =
         }
         if (saptakTraining && revealed) {
             (-1..1).filter { it != saptak }.forEachIndexed { index, otherSaptak ->
-                FilledTonalButton(
-                    onClick = { comparisonSaptak = otherSaptak; playRequest++ },
+                val midi = scale.midi + otherSaptak * 12 + noteIndex
+                val part = otherSaptak + 3
+                HoldPlayButton(
+                    stringResource(R.string.play_saptak, saptakLabel(otherSaptak)),
+                    midi, heldPart == part,
+                    onHold = { heldPart = part; player.play(midi, sustain = true) },
+                    onRelease = { if (heldPart == part) { heldPart = null; player.stop() } },
                     colors = comparisonButtonColors(index),
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
-                ) {
-                    Text(stringResource(R.string.play_saptak, saptakLabel(otherSaptak)), fontSize = 18.sp)
-                }
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
         }
-    }
-    if (stage != 0) {
-        PlaybackCountdown(remaining.value,
-            label = comparisonSaptak?.let { saptakLabel(it) }
-                ?: stringResource(if (stage == 1) R.string.swara_sa else R.string.practice_swara),
-            onDismiss = {
-                player.stop()
-                playRequest = 0
-                stage = 0
-            })
     }
 }
 
@@ -501,10 +724,6 @@ private fun ScalesPage(onSelect: (Int) -> Unit) {
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterVertically),
     ) {
-        item(span = { GridItemSpan(maxLineSpan) }) {
-            Text(stringResource(R.string.scales), fontFamily = FontFamily.Serif,
-                fontSize = 26.sp, modifier = Modifier.padding(bottom = 2.dp))
-        }
         itemsIndexed(Music.scales, key = { _, scale -> scale.midi }) { index, scale ->
             val label = scaleLabel(scale)
             val description = stringResource(R.string.open_scale, label, scale.note)
@@ -598,15 +817,19 @@ private fun SwarasPage(scale: Scale, playing: Int?, holding: Boolean, onPlay: (I
 }
 
 @Composable
-private fun HarmoniumKeyboard(scale: Scale, playing: Int?, onPlay: (Int) -> Unit, onHold: (Int) -> Unit, onRelease: (Int) -> Unit) {
+private fun HarmoniumKeyboard(
+    scale: Scale, playing: Int?, onPlay: (Int) -> Unit,
+    onHold: (Int) -> Unit, onRelease: (Int) -> Unit,
+    noteCount: Int = Music.swaras.size,
+) {
     val blackPitches = setOf(1, 3, 6, 8, 10)
-    val white = Music.swaras.indices.filter { (scale.midi + it) % 12 !in blackPitches }
-    val black = Music.swaras.indices.filter { it !in white }
+    val white = (0 until noteCount).filter { (scale.midi + it) % 12 !in blackPitches }
+    val black = (0 until noteCount).filter { it !in white }
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         val blackKeyRatio = 0.90f
         val raisedTop = 24.dp
         val edgeUnits = (if (0 in black) blackKeyRatio / 2 else 0f) +
-            (if (Music.swaras.lastIndex in black) blackKeyRatio / 2 else 0f)
+            (if (noteCount - 1 in black) blackKeyRatio / 2 else 0f)
         val whiteWidth = (maxWidth - 12.dp) / (white.size + edgeUnits)
         val blackWidth = whiteWidth * blackKeyRatio
         val left = if (0 in black) blackWidth / 2 else 0.dp
