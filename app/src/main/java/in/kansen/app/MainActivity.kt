@@ -88,6 +88,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        cleanUpdateCache(this)
         player = TonePlayer(this) {
             Toast.makeText(this, R.string.audio_error, Toast.LENGTH_SHORT).show()
         }
@@ -271,6 +272,18 @@ private fun Kansen(player: TonePlayer, onLanguageChange: (String) -> Unit) {
                                 onClick = { page = "manual" },
                             )
                         }
+                        SettingsSection(stringResource(R.string.settings_updates)) {
+                            UpdateSettingsRow()
+                        }
+                        val appVersion = remember(context) {
+                            context.packageManager.getPackageInfo(context.packageName, 0).versionName.orEmpty()
+                        }
+                        Text(
+                            stringResource(R.string.app_version, appVersion),
+                            modifier = Modifier.align(Alignment.CenterHorizontally),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = scheme.onSurfaceVariant,
+                        )
                     }
                 } else if (page == "training") {
                     CenteredActions {
@@ -354,7 +367,7 @@ private fun SettingsSection(title: String, content: @Composable ColumnScope.() -
 }
 
 @Composable
-private fun SettingsRow(
+internal fun SettingsRow(
     title: String,
     value: String? = null,
     onClick: () -> Unit,
@@ -419,16 +432,16 @@ private fun ScaleIdentificationPage(player: TonePlayer) {
     var scaleIndex by rememberSaveable { mutableIntStateOf(kotlin.random.Random.nextInt(Music.scales.size)) }
     var revealed by rememberSaveable { mutableStateOf(false) }
     var heardSa by rememberSaveable { mutableStateOf(false) }
-    var heldKey by remember { mutableStateOf<Int?>(null) }
+    var held by remember { mutableStateOf(false) }
     val scale = Music.scales[scaleIndex]
     DisposableEffect(player) { onDispose { player.stop() } }
     CenteredActions {
-        HoldPlayButton(stringResource(R.string.play), scale.midi, heldKey == -1,
+        HoldPlayButton(stringResource(R.string.play), scale.midi, held,
             onHold = {
-                heldKey = -1
-                player.play(scale.midi, sustain = true) { started -> if (started) heardSa = true }
+                held = true
+                player.playForTraining(scale.midi) { heardSa = true }
             },
-            onRelease = { if (heldKey == -1) { heldKey = null; player.stop() } },
+            onRelease = { if (held) { held = false; player.stop() } },
             modifier = Modifier.fillMaxWidth())
         IdentificationActions(
             refreshLabel = stringResource(R.string.refresh),
@@ -436,29 +449,12 @@ private fun ScaleIdentificationPage(player: TonePlayer) {
             enabled = heardSa,
             onRefresh = {
                 player.stop()
-                heldKey = null
+                held = false
                 scaleIndex = (scaleIndex + kotlin.random.Random.nextInt(1, Music.scales.size)) % Music.scales.size
                 revealed = false
                 heardSa = false
             },
             onReveal = { revealed = !revealed },
-        )
-        val playKey: (Int) -> Unit = { index ->
-            heldKey = index
-            player.play(scale.midi + index, sustain = true)
-        }
-        HarmoniumKeyboard(
-            scale = scale,
-            playing = heldKey?.takeIf { it >= 0 },
-            onPlay = { index ->
-                if (heldKey == index) { heldKey = null; player.stop() }
-                else playKey(index)
-            },
-            onHold = playKey,
-            onRelease = { index ->
-                if (heldKey == index) { heldKey = null; player.stop() }
-            },
-            noteCount = 12,
         )
         Box(Modifier.fillMaxWidth().heightIn(min = 104.dp), contentAlignment = Alignment.Center) {
             if (revealed) {
@@ -603,7 +599,7 @@ private fun NoteIdentificationPage(player: TonePlayer, saptakTraining: Boolean =
                 stringResource(R.string.play), midi, heldPart == 0,
                 onHold = {
                     heldPart = 0
-                    player.play(midi, sustain = true) { started -> if (started) heardNote = true }
+                    player.playForTraining(midi) { heardNote = true }
                 },
                 onRelease = { if (heldPart == 0) { heldPart = null; player.stop() } },
                 modifier = Modifier.fillMaxWidth(),
@@ -617,10 +613,8 @@ private fun NoteIdentificationPage(player: TonePlayer, saptakTraining: Boolean =
                         midi, heldPart == part,
                         onHold = {
                             heldPart = part
-                            player.play(midi, sustain = true) { started ->
-                                if (started) {
-                                    if (part == 0) heardSa = true else heardNote = true
-                                }
+                            player.playForTraining(midi) {
+                                if (part == 0) heardSa = true else heardNote = true
                             }
                         },
                         onRelease = { if (heldPart == part) { heldPart = null; player.stop() } },

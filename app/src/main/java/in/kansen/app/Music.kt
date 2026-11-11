@@ -19,6 +19,7 @@ enum class Instrument(val id: String, val label: Int) {
 data class InstrumentTone(val pcm: ShortArray, val loopStart: Int)
 
 object Music {
+    const val FADE_IN_MS = 1000L
     private const val amplitude = 1.0
 
     private fun pcmSample(value: Double): Short =
@@ -53,7 +54,8 @@ object Music {
         val loopCycles = kotlin.math.round(target * 1.5).toInt()
         val loopFrames = kotlin.math.round(sampleRate * loopCycles / target).toInt()
         val actual = sampleRate * loopCycles / loopFrames
-        val introFrames = 48510 // 1.1 s: the loop starts after the one-second fade.
+        val introFrames = 48510 // Keep the settled sustain loop at 1.1 s.
+        val fadeInSeconds = FADE_IN_MS / 1000.0
         val count = introFrames + loopFrames
         val output = DoubleArray(count)
         val start = 0
@@ -220,7 +222,7 @@ object Music {
         // Fade once in PCM, with no timer-driven volume steps. The loop excludes
         // these samples so holding a key never repeats the fade-in.
         return InstrumentTone(ShortArray(rendered.size) {
-            pcmSample(rendered[it] * gain * (it / sampleRate).coerceAtMost(1.0))
+            pcmSample(rendered[it] * gain * (it / (sampleRate * fadeInSeconds)).coerceAtMost(1.0))
         },
             introFrames)
     }

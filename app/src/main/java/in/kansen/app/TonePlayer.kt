@@ -93,6 +93,20 @@ class TonePlayer(context: Context, private val onError: () -> Unit) : AutoClosea
         }
     }
 
+    fun playForTraining(midi: Int, onHeard: () -> Unit) {
+        play(midi, sustain = true) { started ->
+            if (started) {
+                val request = generation
+                main.postDelayed({
+                    // Stops, replacement notes and navigation invalidate this hold.
+                    if (request == generation && track?.playState == AudioTrack.PLAYSTATE_PLAYING) {
+                        onHeard()
+                    }
+                }, Music.FADE_IN_MS)
+            }
+        }
+    }
+
     fun play(midi: Int, sustain: Boolean = false, onStarted: (Boolean) -> Unit = {}) {
         if (closed) { onStarted(false); return }
         stop()
