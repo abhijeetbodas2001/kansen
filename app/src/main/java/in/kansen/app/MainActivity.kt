@@ -216,11 +216,11 @@ private fun Kansen(player: TonePlayer, onLanguageChange: (String) -> Unit) {
                 HorizontalDivider(color = scheme.outlineVariant, modifier = Modifier.padding(horizontal = 16.dp))
                 if (page == "home") {
                     CenteredActions {
-                        Button(onClick = { page = "scales" }, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) {
-                            Text(stringResource(R.string.all_scales), fontSize = 18.sp)
-                        }
-                        FilledTonalButton(onClick = { page = "training" }, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) {
+                        Button(onClick = { page = "training" }, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) {
                             Text(stringResource(R.string.training), fontSize = 18.sp)
+                        }
+                        FilledTonalButton(onClick = { page = "scales" }, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) {
+                            Text(stringResource(R.string.all_scales), fontSize = 18.sp)
                         }
                         FilledTonalButton(onClick = { page = "settings" }, colors = thirdButtonColors(),
                             modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) {
@@ -287,14 +287,14 @@ private fun Kansen(player: TonePlayer, onLanguageChange: (String) -> Unit) {
                     }
                 } else if (page == "training") {
                     CenteredActions {
-                        Button(onClick = { page = "saptak_identification" }, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) {
-                            Text(stringResource(R.string.saptak_identification), fontSize = 18.sp)
+                        Button(onClick = { page = "note_identification" }, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) {
+                            Text(stringResource(R.string.note_identification), fontSize = 18.sp)
                         }
                         FilledTonalButton(onClick = { page = "scale_identification" }, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) {
                             Text(stringResource(R.string.scale_identification), fontSize = 18.sp)
                         }
-                        FilledTonalButton(onClick = { page = "note_identification" }, colors = thirdButtonColors(), modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) {
-                            Text(stringResource(R.string.note_identification), fontSize = 18.sp)
+                        FilledTonalButton(onClick = { page = "saptak_identification" }, colors = thirdButtonColors(), modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) {
+                            Text(stringResource(R.string.saptak_identification), fontSize = 18.sp)
                         }
                     }
                 } else if (page == "scale_identification") {
@@ -545,8 +545,8 @@ private fun HoldPlayButton(
 @Composable
 private fun NoteIdentificationPage(player: TonePlayer, saptakTraining: Boolean = false) {
     var saptak by rememberSaveable { mutableIntStateOf(kotlin.random.Random.nextInt(-1, 2)) }
-    var selectedScale by rememberSaveable { mutableIntStateOf(if (saptakTraining) 0 else -1) }
-    var scaleIndex by rememberSaveable { mutableIntStateOf(if (saptakTraining) 0 else kotlin.random.Random.nextInt(Music.scales.size)) }
+    var selectedScale by rememberSaveable { mutableIntStateOf(if (saptakTraining) 0 else 1) }
+    var scaleIndex by rememberSaveable { mutableIntStateOf(selectedScale) }
     var noteIndex by rememberSaveable { mutableIntStateOf(kotlin.random.Random.nextInt(12)) }
     var revealed by rememberSaveable { mutableStateOf(false) }
     var heardSa by rememberSaveable { mutableStateOf(false) }
